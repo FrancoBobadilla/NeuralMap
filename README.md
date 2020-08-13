@@ -1,0 +1,1 @@
+NeuralMap is a data analysis tool based on Self-Organizing Maps

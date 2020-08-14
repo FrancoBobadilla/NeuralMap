@@ -5,7 +5,7 @@ from collections import Counter
 from sklearn.cluster import KMeans
 
 from numpy import arange, random, zeros, array, unravel_index, isnan, meshgrid, cos, pi, transpose, ogrid, cov, argsort, \
-    linspace, ones, empty, fill_diagonal, nan, nan_to_num, min, mean, argmin, where, isin, warn, unique, quantile
+    linspace, ones, empty, fill_diagonal, nan, nan_to_num, mean, argmin, where, isin, unique, quantile
 
 from numpy.linalg import norm, eig
 
@@ -145,9 +145,8 @@ class NeuralMap:
             msg = 'The data needs at least 2 features for pca initialization'
             raise ValueError(msg)
         if self._x == 1 or self._y == 1:
-            msg = 'PCA initialization inappropriate:' + \
-                  'One of the dimensions of the map is 1.'
-            warn(msg)
+            print('PCA initialization inappropriate:' + \
+                  'One of the dimensions of the map is 1.')
 
         pc_length, pc = eig(cov(transpose(data)))
         pc_order = argsort(-pc_length)
@@ -178,7 +177,7 @@ class NeuralMap:
               final_radius=1.0,
               learning_rate_decay_function='linear',
               radius_decay_function='linear',
-              neighborhood_function='gaussian',
+              neighbourhood_function='gaussian',
               verbosity=True):
 
         # si no se ingresó un rado inicial...
@@ -199,7 +198,16 @@ class NeuralMap:
                         .format(learning_rate_decay_function=learning_rate_decay_function,
                                 valid_decay_functions=_decay_functions.decay_functions)
                 )
-            learning_rate_decay_function = globals()[learning_rate_decay_function]
+            if learning_rate_decay_function == 'linear':
+                learning_rate_decay_function = _decay_functions.linear
+            elif learning_rate_decay_function == 'exponential':
+                learning_rate_decay_function = _decay_functions.exponential
+            elif learning_rate_decay_function == 'rational':
+                learning_rate_decay_function = _decay_functions.rational
+            elif learning_rate_decay_function == 'no_decay':
+                learning_rate_decay_function = _decay_functions.no_decay
+            else:
+                print(learning_rate_decay_function, ' decay function is not available')
 
         if isinstance(radius_decay_function, str):
             if not radius_decay_function in _decay_functions.decay_functions:
@@ -208,16 +216,39 @@ class NeuralMap:
                         .format(radius_decay_function=radius_decay_function,
                                 valid_decay_functions=_decay_functions.decay_functions)
                 )
-            radius_decay_function = globals()[radius_decay_function]
+            if radius_decay_function == 'linear':
+                radius_decay_function = _decay_functions.linear
+            elif radius_decay_function == 'exponential':
+                radius_decay_function = _decay_functions.exponential
+            elif radius_decay_function == 'rational':
+                radius_decay_function = _decay_functions.rational
+            elif radius_decay_function == 'no_decay':
+                radius_decay_function = _decay_functions.no_decay
+            else:
+                print(radius_decay_function, ' decay function is not available')
 
-        if isinstance(neighborhood_function, str):
-            if not neighborhood_function in _neighbourhood_functions.neighbourhood_functions:
+        if isinstance(neighbourhood_function, str):
+            if not neighbourhood_function in _neighbourhood_functions.neighbourhood_functions:
                 raise TypeError(
-                    '{neighborhood_function} is not an accepted distance metric. Should be {valid_neighborhood_functions}!'
-                        .format(neighborhood_function=neighborhood_function,
-                                valid_neighborhood_functions=_neighbourhood_functions.neighbourhood_functions)
+                    '{neighbourhood_function} is not an accepted distance metric. Should be {valid_neighbourhood_functions}!'
+                        .format(neighbourhood_function=neighbourhood_function,
+                                valid_neighbourhood_functions=_neighbourhood_functions.neighbourhood_functions)
                 )
-            neighborhood_function = globals()[neighborhood_function]
+
+            if neighbourhood_function == 'bubble':
+                neighbourhood_function = _neighbourhood_functions.bubble
+            elif neighbourhood_function == 'conical':
+                neighbourhood_function = _neighbourhood_functions.conical
+            elif neighbourhood_function == 'gaussian':
+                neighbourhood_function = _neighbourhood_functions.gaussian
+            elif neighbourhood_function == 'gaussian_cut':
+                neighbourhood_function = _neighbourhood_functions.gaussian_cut
+            elif neighbourhood_function == 'mexican_hat':
+                neighbourhood_function = _neighbourhood_functions.mexican_hat
+            elif neighbourhood_function == 'no_neighbourhood':
+                neighbourhood_function = _neighbourhood_functions.no_neighbourhood
+            else:
+                print(neighbourhood_function, ' neighbourhood function is not available')
 
         # se checkean los datos ingresados
         _check_inputs.np_matrix(data)
@@ -233,7 +264,7 @@ class NeuralMap:
         _check_inputs.value_type(final_radius, float)
         _check_inputs.function(learning_rate_decay_function, 4)
         _check_inputs.function(radius_decay_function, 4)
-        # _check_inputs.function(neighborhood_function, 3)
+        # _check_inputs.function(neighbourhood_function, 3)
         _check_inputs.value_type(verbosity, bool)
 
         if weights_init_method == 'standard':
@@ -328,8 +359,8 @@ class NeuralMap:
                     ver_disp.fill(v)
 
                     # se calcula la matriz de actualizaciones
-                    # g = neighborhood_function(self._cart_coord, center, radius) * learning_rate
-                    g = neighborhood_function(self._cart_coord, self._cart_coord[center], radius, learning_rate)
+                    # g = neighbourhood_function(self._cart_coord, center, radius) * learning_rate
+                    g = neighbourhood_function(self._cart_coord, self._cart_coord[center], radius, learning_rate)
 
                     '''La matriz de actualizaciones (g) calculada sobre el centro del mapa debe ser desplazada para 
                     que coincida con la bmu. De esta manera se logra emular un espacio toroidal. Para eso se 
@@ -415,7 +446,7 @@ class NeuralMap:
                     winner_node = self._cart_coord[self.winner(d)]
 
                     # se calcula la matriz de actualizaciones
-                    g = neighborhood_function(self._cart_coord, winner_node, radius, learning_rate)
+                    g = neighbourhood_function(self._cart_coord, winner_node, radius, learning_rate)
 
                     # se actualizan los pesos de la red
                     # self._weights += einsum('ij, ijk->ijk', g, d - self._weights)

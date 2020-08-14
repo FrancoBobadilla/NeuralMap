@@ -1,7 +1,7 @@
 from numba import jit, float64
 from numpy import empty, exp
 
-neighbourhood_functions = ['bubble', 'conical', 'gaussian', 'gaussian_cut', 'mexican_hat', 'no_neighborhood']
+neighbourhood_functions = ['bubble', 'conical', 'gaussian', 'gaussian_cut', 'mexican_hat', 'no_neighbourhood']
 
 
 @jit(float64[:, :](float64[:, :, :], float64[:], float64, float64), nopython=True, fastmath=True)
@@ -60,7 +60,7 @@ def mexican_hat(cart_coord, bmu, radius, learning_rate):
 
 
 @jit(float64[:, :](float64[:, :, :], float64[:], float64, float64), nopython=True, fastmath=True)
-def no_neighborhood(cart_coord, bmu, radius, learning_rate):
+def no_neighbourhood(cart_coord, bmu, radius, learning_rate):
     res = empty((cart_coord.shape[0], cart_coord.shape[1]), dtype=cart_coord.dtype)
     for i in range(cart_coord.shape[0]):
         for j in range(cart_coord.shape[1]):

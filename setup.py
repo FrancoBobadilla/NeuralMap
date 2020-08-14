@@ -3,8 +3,8 @@
 from distutils.core import setup
 
 setup(
-    name='neural-map',
-    packages=['neural-map'],
+    name='neural_map',
+    packages=['neural_map'],
     version='0.1',
     license='MIT',
     description='NeuralMap is a data analysis tool based on Self-Organizing Maps',

@@ -139,4 +139,7 @@ cython_debug/
 
 # Pycharm
 .idea/
+
+# Jupyter Notebook related folders
 /examples/.ipynb_checkpoints/
+/examples/datasets/

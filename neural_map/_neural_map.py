@@ -332,7 +332,7 @@ class NeuralMap:
 
                 if verbosity:
                     # se imprime el progreso
-                    print('\n\nEpoch: ', epoch + 1, ' of ', num_epochs,
+                    print('\nEpoch: ', epoch + 1, ' of ', num_epochs,
                           '    Learning rate: ', learning_rate,
                           '    Radius: ', radius)
 

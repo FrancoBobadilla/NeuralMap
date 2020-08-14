@@ -42,7 +42,7 @@ def gaussian_cut(cart_coord, bmu, radius, learning_rate):
     for i in range(cart_coord.shape[0]):
         for j in range(cart_coord.shape[1]):
             val = ((cart_coord[i, j, 0] - bmu[0]) ** 2 + (cart_coord[i, j, 1] - bmu[1]) ** 2) / radius ** 2
-            if val > 1.:
+            if val >= 1.:
                 res[i, j] = 0.
             else:
                 res[i, j] = exp(-val) * learning_rate

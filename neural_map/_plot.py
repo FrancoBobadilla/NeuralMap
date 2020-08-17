@@ -4,10 +4,70 @@ from matplotlib import cm, colorbar, colors, pyplot as plt
 from numpy import ones, nanmax, nanmin, arange, sin, pi, ndarray, isnan, unravel_index, sqrt
 
 
+def update(cart_coord, hexagonal, data, xy, winner_node, rp, despl):
+    cmap = cm.RdYlGn_r
+
+    data_c = data.copy()
+    data_max = nanmax(data_c)
+    data_min = nanmin(data_c)
+
+    if data_max == data_min:
+        data_max = 1.
+        data_min = 0.
+
+    data_c -= data_min
+    data_c /= data_max - data_min
+
+    xrange = arange(cart_coord.shape[0])
+    yrange = arange(cart_coord.shape[1])
+
+    f = plt.figure(figsize=(5, 5))
+    ax = f.add_subplot(111)
+    ax.set_aspect('equal')
+
+    ax_cb = make_axes_locatable(ax).new_horizontal(size="5%", pad=0.25)
+
+    if hexagonal:
+        numVertices = 6
+        radius = sin(pi / 3) * 2 / 3
+        orientation = 0
+        ax.set_xticks(xrange)
+        ax.set_yticks(yrange * sin(pi / 3))
+
+    else:
+        numVertices = 4
+        radius = sin(pi / 4)
+        orientation = pi / 4
+        ax.set_xticks(xrange)
+        ax.set_yticks(yrange)
+
+    # ax.set_xticklabels(xrange)
+    # ax.set_yticklabels(yrange)
+
+    for i in range(data_c.shape[0]):
+        for j in range(data_c.shape[1]):
+            ax.add_patch(
+                RegularPolygon(cart_coord[i, j], numVertices=numVertices, radius=radius, orientation=orientation,
+                               facecolor=cmap(data_c[i, j]), edgecolor=cmap(data_c[i, j])))
+
+    ax.add_patch(Circle(winner_node, radius=radius / 3, facecolor='white', edgecolor='white'))
+    ax.add_patch(Circle((winner_node + xy / 2) % xy, radius=radius / 3, facecolor='black', edgecolor='black'))
+    ax.quiver(rp[..., 0], rp[..., 1], despl[..., 0], despl[..., 1], angles='xy', scale_units='xy', scale=1, zorder=10)
+
+    ax.plot(cart_coord[..., 0].max(), cart_coord[..., 1].max(), ' ', alpha=0)
+    ax.plot(cart_coord[..., 0].min(), cart_coord[..., 1].min(), ' ', alpha=0)
+
+    colorbar.ColorbarBase(ax_cb, cmap=cmap, orientation='vertical', norm=colors.Normalize(vmin=data_min, vmax=data_max))
+    f.add_axes(ax_cb)
+
+
 def tiles(cart_coord, hexagonal, data, cmap=cm.RdYlGn_r, size=10, borders=False, norm=True, labels=None,
-               intensity=None, title=None):
+          intensity=None, title=None):
     if intensity is None:
         intensity = ones((cart_coord.shape[0], cart_coord.shape[1]))
+
+    if labels is not None:
+        cmap = plt.cm.get_cmap('hsv', len(labels) + 1)
 
     data_c = data.copy()
     data_max = nanmax(data_c)
@@ -134,13 +194,14 @@ def tiles(cart_coord, hexagonal, data, cmap=cm.RdYlGn_r, size=10, borders=False,
     else:
         ax.legend(bbox_to_anchor=(1, 1), handles=[Patch(color=cmap(k), label=label) for k, label in enumerate(labels)])
 
-    plt.show()
-
 
 def bubbles(diameters, cart_coord, data, connection_matrix=None, reverse_matrix=None, norm=True, labels=None,
-                 intensity=None, title='plot', cmap=cm.RdYlGn_r, size=10, borders=False, show_empty_nodes=True):
+            intensity=None, title='plot', cmap=cm.RdYlGn_r, size=10, borders=False, show_empty_nodes=True):
     if intensity is None:
         intensity = ones((cart_coord.shape[0], cart_coord.shape[1]))
+
+    if labels is not None:
+        cmap = plt.cm.get_cmap('hsv', len(labels) + 1)
 
     d_max = diameters.max()
 
@@ -236,5 +297,3 @@ def bubbles(diameters, cart_coord, data, connection_matrix=None, reverse_matrix=
         f.add_axes(ax_cb)
     else:
         ax.legend(bbox_to_anchor=(1, 1), handles=[Patch(color=cmap(k), label=label) for k, label in enumerate(labels)])
-
-    plt.show()

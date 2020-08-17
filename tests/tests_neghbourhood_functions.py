@@ -153,3 +153,7 @@ class NoNeighbourhoodTestCase(unittest.TestCase):
         g_c[x_coord, y_coord] = 0.
         self.assertEqual(g_c.min(), 0, 'min value is not zero')
         self.assertEqual(g_c.max(), 0, 'max value is not zero (excluding bmu)')
+
+
+if __name__ == '__main__':
+    unittest.main()

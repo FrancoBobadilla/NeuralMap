@@ -105,22 +105,18 @@ class NeuralMap:
         # crea el mapa de activación, con valores iniciales de 0
         self._activation_map = zeros((self._x, self._y))
 
-        # crea dos matrices, con las posiciones verticales y horizontales de los nodos
-        xx, yy = array(meshgrid(arange(self._x), arange(self._y)), dtype=float)
-
-        # si la topología es hexagonal...
+        self._cart_coord = transpose(meshgrid(arange(self._x), arange(self._y)), axes=[2, 1, 0]).astype(float)
         if self._hexagonal:
-            # ... se desplazan todas las filas pares media posición
-            xx[::2] += 0.5
+            self._cart_coord[:, 0::2, 0] += 0.5
+            self._cart_coord[..., 1] *= (3 ** 0.5) * 0.5
+            self._height *= (3 ** 0.5) * 0.5
 
-            # se "aplasta" el mapa para que todos los nodos adyacentes estén a la misma distancia
-            yy *= cos(pi / 6)
-
-            # se calcula el nuevo alto del mapa
-            self._height *= cos(pi / 6)
-
-        # se unifican las matrices con las posiciones horizontales y verticales de los nodos
-        self._cart_coord = transpose(array([xx.T, yy.T]), axes=[1, 2, 0])
+        # xx, yy = array(meshgrid(arange(self._x), arange(self._y)), dtype=float)
+        # if self._hexagonal:
+        #     xx[::2] += 0.5
+        #     yy *= (3 ** 0.5) * 0.5
+        #     self._height *= (3 ** 0.5) * 0.5
+        # self._cart_coord = transpose(array([xx.T, yy.T]), axes=[1, 2, 0])
 
         if rp is None:
             # se inicializan las pocisiones relativas de los nodos en la posición "fija" que cada uno tiene
@@ -133,6 +129,9 @@ class NeuralMap:
                 self._rp = rp
 
         self._current_epoch = 0
+
+        self._unified_distance_matrix_cache = None
+        self._hdbscan_cache = [None] * self._x * self._y
 
     def pca_weights_init(self, data):
         """Initializes the weights to span the first two principal components.
@@ -178,7 +177,8 @@ class NeuralMap:
               learning_rate_decay_function='linear',
               radius_decay_function='linear',
               neighbourhood_function='gaussian',
-              verbosity=True):
+              verbosity=True,
+              plot_update=False):
 
         # si no se ingresó un rado inicial...
         if initial_radius is None:
@@ -190,6 +190,9 @@ class NeuralMap:
             # ... no se utiliza función de disminución para learning rate ni radius
             learning_rate_decay_function = _decay_functions.no_decay
             radius_decay_function = _decay_functions.no_decay
+
+        self._unified_distance_matrix_cache = None
+        self._hdbscan_cache = [None] * self._x * self._y
 
         if isinstance(learning_rate_decay_function, str):
             if not learning_rate_decay_function in _decay_functions.decay_functions:
@@ -336,7 +339,7 @@ class NeuralMap:
                           '    Learning rate: ', learning_rate,
                           '    Radius: ', radius)
 
-                # pr = True
+                pr = plot_update
 
                 # para cada iteración...
                 for iteration in iterations:
@@ -394,11 +397,12 @@ class NeuralMap:
                     # despl = einsum('ij, ijk->ijk', g, (self._cart_coord[winner_node] - mod - self._rp))
                     despl = (self._cart_coord[winner_node] - mod - self._rp) * g[..., None]
 
-                    # if pr:
-                    #     pr = False
-                    #     show_act(self._hexagonal, self._x, self._y, self._cart_coord, g, winner_node, xy, self._rp,
-                    #              despl)
-                    #     # print((self._width, self._height, winner_node, self._cart_coord, center, g, self._rp))
+                    if pr:
+                        pr = False
+                        _plot.update(self._cart_coord, self._hexagonal, g, xy, self._cart_coord[winner_node], self._rp,
+                                     despl)
+                        plt.show()
+                        # print((self._width, self._height, winner_node, self._cart_coord, center, g, self._rp, '\n\n'))
 
                     # se actualiza la matriz de RP
                     self._rp += despl
@@ -435,7 +439,7 @@ class NeuralMap:
                           '    Learning rate: ', learning_rate,
                           '    Radius: ', radius)
 
-                # pr = True
+                pr = plot_update
 
                 # para cada iteración...
                 for iteration in iterations:
@@ -454,15 +458,15 @@ class NeuralMap:
 
                     # se calcula el desplazamiento que debe aplicarse a cada RP
                     # despl = einsum('ij, ijk->ijk', g, winner_node - self._rp)
-                    self._rp += (winner_node - self._rp) * g[..., None]
+                    despl = (winner_node - self._rp) * g[..., None]
 
-                    # if pr:
-                    #     pr = False
-                    #     show_act(self._hexagonal, self._x, self._y, self._cart_coord, g, winner_node, xy, self._rp,
-                    #              despl)
+                    if pr:
+                        pr = False
+                        _plot.update(self._cart_coord, self._hexagonal, g, xy, winner_node, self._rp, despl)
+                        plt.show()
 
                     # se actualiza la matriz de RP
-                    # self._rp += despl
+                    self._rp += despl
 
                 # se calcula el promedio de la época
                 if eval_data is not None:
@@ -503,6 +507,9 @@ class NeuralMap:
         return unravel_index(am.argmin(), self._activation_map.shape)
 
     def unified_distance_matrix(self):
+
+        if self._unified_distance_matrix_cache is not None:
+            return self._unified_distance_matrix_cache
 
         adjacency_matrix = ones((self._x * self._y, self._x * self._y)) * nan
         fill_diagonal(adjacency_matrix, 0.)
@@ -604,8 +611,8 @@ class NeuralMap:
                     # ... se asigna nan
                     um[x, y, ady] = nan
 
-        # retorna la matriz de distancia unificada
-        return um, adjacency_matrix
+        self._unified_distance_matrix_cache = um, adjacency_matrix
+        return self._unified_distance_matrix_cache
 
     def analyse(self, data):
 
@@ -704,7 +711,10 @@ class NeuralMap:
         _check_inputs.value_type(min_cluster_size, int)
         _check_inputs.value_type(plot_condensed_tree, bool)
 
-        umatrix, distance_matrix = self.unified_distance_matrix()
+        if self._hdbscan_cache[min_cluster_size] is not None:
+            return self._hdbscan_cache[min_cluster_size]
+
+        distance_matrix = self.unified_distance_matrix()[1]
         clusterer = HDBSCAN(metric='precomputed', min_cluster_size=min_cluster_size, min_samples=2)
         clusterer.fit(nan_to_num(distance_matrix, nan=1e8))
 
@@ -722,8 +732,10 @@ class NeuralMap:
         if plot_condensed_tree:
             clusterer.condensed_tree_.plot(select_clusters=True, label_clusters=True)
 
-        return labels.reshape(self._x, self._y), probabilities.reshape(self._x, self._y), outlier_scores.reshape(
+        self._hdbscan_cache[min_cluster_size] = labels.reshape(self._x, self._y), probabilities.reshape(self._x,
+                                                                                                        self._y), outlier_scores.reshape(
             self._x, self._y)
+        return self._hdbscan_cache[min_cluster_size]
 
     def evaluate(self, data):
 
@@ -806,11 +818,11 @@ class NeuralMap:
         _check_inputs.positive(size)
 
         actfreq, q, mean_distane = self.analyse(data)
-        umatrix, distance_matrix = self.unified_distance_matrix()
+        distance_matrix = self.unified_distance_matrix()[1]
 
         if cluster:
-            clusters_labels = HDBSCAN(metric='precomputed', min_cluster_size=min_cluster_size, min_samples=2).fit(
-                nan_to_num(distance_matrix, nan=1e8)).labels_
+            clusters_labels = self.hdbscan(min_cluster_size=min_cluster_size, plot_condensed_tree=False)[0].reshape(
+                self._x * self._y)
 
             # if restrictive_conf and self.toroidal == False:
             #   for i in [[0, 1, self.y], [self.y - 1, 2 * self.y - 2, 2 * self.y - 1], [-self.y, -self.y + 1, -2 * self.y], [-1, -2, -self.y - 1]]:
@@ -924,7 +936,6 @@ class NeuralMap:
             labels = list(range(node.shape[0]))
 
         plt.xticks(ticks=list(range(node.shape[0])), labels=labels, rotation='vertical')
-        plt.show()
 
     def plot_set_weight_vectors(self, cluster=None, labels=None, min_cluster_size=3, show_median=False, show_mean=True,
                                 show_lines=True):
@@ -981,12 +992,10 @@ class NeuralMap:
             labels = list(range(self._z))
 
         plt.xticks(ticks=list(range(self._z)), labels=labels, rotation='vertical')
-        plt.show()
 
         # plt.figure(figsize=(20, 5))
         # plt.boxplot(values)
         # plt.xticks(ticks=list(range(1, 1 + self._z)), labels=df.drop(columns=l_columns).columns, rotation='vertical')
-        # plt.show()
 
     '''
     getters y setters
@@ -1071,22 +1080,8 @@ class NeuralMap:
         return self._height
 
     @property
-    def weights(self):
-        return self._weights
-
-    @weights.setter
-    def weights(self, weights):
-        if _check_inputs.shape(weights, self._weights.shape):
-            self._weights = weights
-
-    @property
     def rp(self):
         return self._rp
-
-    @rp.setter
-    def rp(self, rp):
-        if _check_inputs.shape(rp, self._rp.shape):
-            self._rp = rp
 
     @property
     def cart_coord(self):
@@ -1095,3 +1090,14 @@ class NeuralMap:
     @property
     def activation_map(self):
         return self._activation_map
+
+    @property
+    def weights(self):
+        return self._weights
+
+    @weights.setter
+    def weights(self, weights):
+        if _check_inputs.shape(weights, self._weights.shape):
+            self._unified_distance_matrix_cache = None
+            self._hdbscan_cache = [None] * self._x * self._y
+            self._weights = weights

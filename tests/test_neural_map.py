@@ -1,12 +1,11 @@
 import unittest
 from ..neural_map import NeuralMap
-import matplotlib.pyplot as plt
 
 tolerance = 1e-8
 constructor_values = {
-    'z': 5,
-    'x': 7,
-    'y': 20,
+    'z': 3,
+    'x': 4,
+    'y': 5,
     'hexagonal': True
 }
 
@@ -21,9 +20,6 @@ class CartCoordTestCase(unittest.TestCase):
 
     def test_boundaries(self):
         cart_coord = self.som.cart_coord.reshape(-1, 2)
-
-        plt.scatter(cart_coord[..., 0], cart_coord[..., 1])
-        plt.show()
 
         left = 0.0
         right = self.som.x
@@ -45,9 +41,23 @@ class CartCoordTestCase(unittest.TestCase):
                 distance = euclidean(ref_position, comp_position)
                 if distance != 0:
                     self.assertLessEqual(1.0, distance + tolerance,
-                                            'there are at least two nodes closer than they should')
+                                         'there are at least two nodes closer than they should')
 
-    def test_adjacency(self):
+    def test_index_position_consistency(self):
+        cart_coord = self.som.cart_coord // 1
+        for ref_i in range(cart_coord.shape[0]):
+            for ref_j in range(cart_coord.shape[1]):
+                for comp_i in range(cart_coord.shape[0]):
+                    for comp_j in range(cart_coord.shape[1]):
+                        if ref_i == comp_i:
+                            self.assertEqual(cart_coord[ref_i, ref_j, 0], cart_coord[comp_i, comp_j, 0],
+                                             'index consistency not preserved')
+
+                        if ref_j == comp_j:
+                            self.assertEqual(cart_coord[ref_i, ref_j, 1], cart_coord[comp_i, comp_j, 1],
+                                             'index consistency not preserved')
+
+    def test_inner_adjacency(self):
         cart_coord = self.som.cart_coord.reshape(-1, 2)
 
         expected_inner_nodes = (self.som.x - 2) * (self.som.y - 2)

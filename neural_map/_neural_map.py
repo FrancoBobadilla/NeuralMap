@@ -341,6 +341,12 @@ class NeuralMap:
 
                 pr = plot_update
 
+                # plt.scatter(self._rp[..., 0], self._rp[..., 1])
+                # plt.show()
+                # plt.scatter((self._rp[..., 0] + self._width / 3) % self._width,
+                #             (self._rp[..., 1] + self._height / 3) % self._height)
+                # plt.show()
+
                 # para cada iteración...
                 for iteration in iterations:
                     # ... se toma el dato correspondiente a la iteración
@@ -412,6 +418,7 @@ class NeuralMap:
 
                 if eval_data is not None:
                     quantization_error[epoch], topographic_error[epoch] = self.evaluate(eval_data)
+
 
         else:
 
@@ -737,7 +744,7 @@ class NeuralMap:
             self._x, self._y)
         return self._hdbscan_cache[min_cluster_size]
 
-    def evaluate(self, data):
+    def evaluate(self, data, plot=False):
 
         # se checkea el conjunto de datos ingresado
         _check_inputs.np_matrix(data)
@@ -756,9 +763,10 @@ class NeuralMap:
         quantization_error = 0
 
         # para cada dato...
-        for x in data:
+        for index, x in enumerate(data):
 
             activation_map = self.activate(x)
+
             f_bmu = unravel_index(argmin(activation_map), activation_map.shape)
             quantization_error += activation_map[f_bmu]
 
@@ -784,6 +792,15 @@ class NeuralMap:
                     error = 0
 
             topographic_error += error
+
+            #
+            if error and plot:
+                activation_map[f_bmu] = nan
+                activation_map[s_bmu] = nan
+                print('\n\n', index)
+                _plot.tiles(cart_coord=self._cart_coord, hexagonal=self._hexagonal, data=activation_map, size=5)
+                plt.show()
+
 
         # retorna la matriz de distancia unificada
         return quantization_error / data.shape[0], topographic_error / data.shape[0]

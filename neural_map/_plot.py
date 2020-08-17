@@ -255,7 +255,7 @@ def bubbles(diameters, cart_coord, data, connection_matrix=None, reverse_matrix=
                             second_pos = (second_pos + first_pos) / 2
 
                     plt.plot([first_pos[0], second_pos[0]], [first_pos[1], second_pos[1]], zorder=-d_max * 2,
-                             color='black', alpha=cm_min / connection_matrix[i, j])
+                             color='black', alpha=(0.1 + cm_min / connection_matrix[i, j]) / 1.1)
 
     for i in range(data_c.shape[0]):
         for j in range(data_c.shape[1]):

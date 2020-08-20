@@ -4,7 +4,7 @@ from collections import Counter
 
 from sklearn.cluster import KMeans
 
-from numpy import arange, random, zeros, array, unravel_index, isnan, meshgrid, cos, pi, transpose, ogrid, cov, argsort, \
+from numpy import arange, random, zeros, array, unravel_index, isnan, meshgrid, transpose, ogrid, cov, argsort, \
     linspace, ones, empty, fill_diagonal, nan, nan_to_num, mean, argmin, where, isin, unique, quantile
 
 from numpy.linalg import norm, eig
@@ -23,12 +23,13 @@ class NeuralMap:
                  z,
                  x=20,
                  y=20,
-                 metric='euclidean',
                  hexagonal=True,
                  toroidal=False,
-                 seed=None,
                  rp=None,
-                 weights=None
+                 weights=None,
+                 seed=None,
+                 metric='euclidean',
+                 **kwargs
                  ):
 
         # si no se ingresa una semilla aleatoria...
@@ -42,13 +43,10 @@ class NeuralMap:
             # muestra al usuario la semilla generada
             print('seed: ', seed)
 
-        # if isinstance(metric, str):
-        #   if not metric in distance_metrics:
-        #     raise TypeError(
-        #       '{metric} is not an accepted distance metric. Should be {valid_metrics}!'
-        #       .format(metric=metric, valid_metrics=distance_metrics)
-        #     )
-        #   metric = globals()[metric]
+        if isinstance(metric, str):
+            self._string_metric = True
+        else:
+            self._string_metric = False
 
         # se checkean todos los datos ingresados
         _check_inputs.value_type(z, int)
@@ -73,6 +71,7 @@ class NeuralMap:
 
         # se configura la métrica de distancia utilizada
         self._metric = metric
+        self._kwargs = kwargs
 
         # configura si la topología del mapa es hexagonal (o cuadrada)
         self._hexagonal = hexagonal
@@ -132,6 +131,9 @@ class NeuralMap:
 
         self._unified_distance_matrix_cache = None
         self._hdbscan_cache = [None] * self._x * self._y
+
+        # check if input metric is valid
+        self._distance(array([[0., 1.]]), array([[1., 2.], [3., 4.]]))
 
     def pca_weights_init(self, data):
         """Initializes the weights to span the first two principal components.
@@ -494,12 +496,17 @@ class NeuralMap:
             plt.grid()
             plt.show()
 
+    def _distance(self, x, y):
+        if self._string_metric:
+            return cdist(x, y, self._metric, **self._kwargs)
+        else:
+            return self._metric(x, y, **self._kwargs)
+
     def activate(self, x):
 
         # se calcula el mapa de activación con el dato ingresado
-        # self._activation_map = self._metric(self._weights, x)
-        self._activation_map = cdist(x.reshape([1, -1]), self._weights.reshape(
-            [self._weights.shape[0] * self._weights.shape[1], self._weights.shape[2]]), self._metric).reshape(
+        self._activation_map = self._distance(x.reshape([1, -1]), self._weights.reshape(
+            [self._weights.shape[0] * self._weights.shape[1], self._weights.shape[2]])).reshape(
             [self._weights.shape[0], self._weights.shape[1]])
 
         # devuelve el mapa de activación
@@ -555,10 +562,8 @@ class NeuralMap:
                         neighbour = array([[self._weights[(x + i + self._x) % self._x, (y + j + self._y) % self._y]]])
 
                         # se calcula la distancia entre el nodo y su vecino
-                        # distance = self._metric(self._weights[x, y], neighbour)
-                        distance = \
-                            cdist(self._weights[x, y].reshape([1, -1]), neighbour[0, 0].reshape([1, -1]), self._metric)[
-                                0, 0]
+                        distance = self._distance(self._weights[x, y].reshape([1, -1]),
+                                                  neighbour[0, 0].reshape([1, -1]))
 
                         # se asigna la distancia calcular al valor que tiene la matriz para esa posición
                         um[x, y, k] = distance
@@ -582,11 +587,8 @@ class NeuralMap:
                             neighbour = array([[self._weights[x + i, y + j]]])
 
                             # se calcula la distancia entre el nodo y su vecino
-                            # distance = self._metric(self._weights[x, y], neighbour)
-                            distance = \
-                                cdist(self._weights[x, y].reshape([1, -1]), neighbour[0, 0].reshape([1, -1]),
-                                      self._metric)[
-                                    0, 0]
+                            distance = self._distance(self._weights[x, y].reshape([1, -1]),
+                                                      neighbour[0, 0].reshape([1, -1]))
 
                             # se lo suma la distancia al valor que tiene la matriz para esa posición
                             um[x, y, k] = distance
@@ -706,8 +708,14 @@ class NeuralMap:
         _check_inputs.value_type(n_clusters, int)
         _check_inputs.positive(n_clusters)
 
+        if self._string_metric:
+            metric = self._metric
+
+        else:
+            metric = lambda x, y: self._metric(array([x]), array([y]), **self._kwargs)
+
         # inicializa la instancia de KMedoids
-        clusterer = KMedoids(n_clusters=n_clusters, init="k-medoids++", metric=self._metric).fit(
+        clusterer = KMedoids(n_clusters=n_clusters, init="k-medoids++", metric=metric).fit(
             self._weights.reshape(self._x * self._y, self._z))
 
         # retorna los clusters y los centros
@@ -801,7 +809,6 @@ class NeuralMap:
                 _plot.tiles(cart_coord=self._cart_coord, hexagonal=self._hexagonal, data=activation_map, size=5)
                 plt.show()
 
-
         # retorna la matriz de distancia unificada
         return quantization_error / data.shape[0], topographic_error / data.shape[0]
 
@@ -812,15 +819,18 @@ class NeuralMap:
             metric = custom_metric
 
         return {
-            'z': self._z,
-            'x': self._x,
-            'y': self._y,
-            'metric': metric,
-            'hexagonal': self._hexagonal,
-            'toroidal': self._toroidal,
-            'seed': self._seed,
-            'weights': self._weights.tolist(),
-            'rp': self._rp.tolist()
+            **{
+                'z': self._z,
+                'x': self._x,
+                'y': self._y,
+                'metric': metric,
+                'hexagonal': self._hexagonal,
+                'toroidal': self._toroidal,
+                'seed': self._seed,
+                'weights': self._weights.tolist(),
+                'rp': self._rp.tolist()
+            },
+            **self._kwargs
         }
 
     def plot_analysis(self, data, labels=None, types_to_display=None, attached_values=None, func=mean,

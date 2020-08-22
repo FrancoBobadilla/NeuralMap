@@ -1,15 +1,4 @@
 from numpy import isinf, isnan, ndarray
-from inspect import signature
-
-
-def data_to_analyze(data, expected_len):
-    if expected_len != len(data[0]):
-        raise ValueError(
-            'Received {data_length} features, expected {length}.'
-                .format(data_length=len(data[0]), length=expected_len)
-        )
-
-    return True
 
 
 def attachments(data, attachments):
@@ -67,27 +56,16 @@ def positive(value):
     return True
 
 
-def function(func, num_params):
-    if not isinstance(num_params, int):
-        raise TypeError(
-            'num_params should be int!'
-        )
-
+def function(func):
     if not callable(func):
         raise TypeError(
-            'Value {func} is {value_type}, but should be a function with {num_params} params!'
-                .format(func=func, value_type=type(func), num_params=num_params))
-
-    if not len(signature(func).parameters) is num_params:
-        raise TypeError(
-            'Function {func} has {funct_num_params} params, but should have {num_params} params!'
-                .format(func=func, funct_num_params=len(signature(func).parameters), num_params=num_params)
-        )
+            'Value {func} is {value_type}, but should be callable!'
+                .format(func=func, value_type=type(func)))
 
     return True
 
 
-def np_matrix(data):
+def np_matrix(data, expected_len):
     if not isinstance(data, ndarray):
         raise TypeError(
             'Input data is {data_type}, but should be {types}!'
@@ -106,10 +84,10 @@ def np_matrix(data):
                 .format(data_rows=data.shape[0], rows=0)
         )
 
-    if not data.shape[1] > 0:
-        raise TypeError(
-            'Input data has {data_columns} columns, but should have more than {columns}!'
-                .format(data_columns=data.shape[1], columns=0)
+    if not data.shape[1] == expected_len:
+        raise ValueError(
+            'Received {data_length} features, expected {length}.'
+                .format(data_length=data.shape[1], length=expected_len)
         )
 
     if isnan(data).any():

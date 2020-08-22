@@ -5,7 +5,7 @@ from collections import Counter
 from sklearn.cluster import KMeans
 
 from numpy import arange, random, zeros, array, unravel_index, isnan, meshgrid, transpose, ogrid, cov, argsort, \
-    linspace, ones, empty, fill_diagonal, nan, nan_to_num, mean, argmin, where, isin, unique, quantile
+    linspace, fill_diagonal, nan, nan_to_num, mean, argmin, where, isin, unique, quantile
 
 from numpy.linalg import norm, eig
 
@@ -16,6 +16,10 @@ from hdbscan import HDBSCAN
 from sklearn_extra.cluster import KMedoids
 
 from . import _plot, _check_inputs, _decay_functions, _neighbourhood_functions
+
+
+def _identity(x):
+    return x
 
 
 class NeuralMap:
@@ -35,18 +39,21 @@ class NeuralMap:
         # si no se ingresa una semilla aleatoria...
         if seed is None:
             # ... inicializa un generador aleatorio
-            random.seed()
+            random.seed(None)
 
             # se crea una semilla, de forma aleatoria
-            seed = random.randint(low=0, high=1000)
+            seed = random.randint(low=0, high=10000)
 
             # muestra al usuario la semilla generada
             print('seed: ', seed)
 
-        if isinstance(metric, str):
-            self._string_metric = True
-        else:
-            self._string_metric = False
+        if weights is not None:
+            weights = array(weights).astype(float)
+            _check_inputs.shape(weights, (self._x, self._y, self._z))
+
+        if rp is not None:
+            rp = array(rp).astype(float)
+            _check_inputs.shape(rp, (self._x, self._y, self._z))
 
         # se checkean todos los datos ingresados
         _check_inputs.value_type(z, int)
@@ -55,10 +62,22 @@ class NeuralMap:
         _check_inputs.positive(x)
         _check_inputs.value_type(y, int)
         _check_inputs.positive(y)
-        # _check_inputs.function(metric, 2)
         _check_inputs.value_type(hexagonal, bool)
         _check_inputs.value_type(toroidal, bool)
         _check_inputs.value_type(seed, int)
+
+        if isinstance(metric, str):
+            self._string_metric = True
+        else:
+            self._string_metric = False
+
+        # se configura la métrica de distancia utilizada
+        self._metric = metric
+
+        self._kwargs = kwargs
+
+        # check if input metric is valid
+        self._distance(array([[0., 1.]]), array([[1., 2.], [3., 4.]]))
 
         # se configura la cantidad horizontal de nodos
         self._x = x
@@ -68,10 +87,6 @@ class NeuralMap:
 
         # se configura la cantidad de elementos de los vectores de pesos de los nodos
         self._z = z
-
-        # se configura la métrica de distancia utilizada
-        self._metric = metric
-        self._kwargs = kwargs
 
         # configura si la topología del mapa es hexagonal (o cuadrada)
         self._hexagonal = hexagonal
@@ -95,20 +110,21 @@ class NeuralMap:
             # inicia los pesos en 0
             self._weights = zeros((self._x, self._y, self._z))
         else:
-            weights = array(weights).astype(float)
-            if not weights.shape == (self._x, self._y, self._z):
-                print("ERROR EN INGRESAR weights")
-            else:
-                self._weights = weights
+            self._weights = weights
 
         # crea el mapa de activación, con valores iniciales de 0
         self._activation_map = zeros((self._x, self._y))
 
+        self._ij = [[(1, 0), (0, 1), (-1, 0), (0, -1)], [(1, 0), (0, 1), (-1, 0), (0, -1)]]
+
         self._cart_coord = transpose(meshgrid(arange(self._x), arange(self._y)), axes=[2, 1, 0]).astype(float)
+
         if self._hexagonal:
             self._cart_coord[:, 0::2, 0] += 0.5
             self._cart_coord[..., 1] *= (3 ** 0.5) * 0.5
             self._height *= (3 ** 0.5) * 0.5
+            self._ij = [[(1, 0), (1, 1), (0, 1), (-1, 0), (0, -1), (1, -1)],
+                        [(1, 0), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1)]]
 
         # xx, yy = array(meshgrid(arange(self._x), arange(self._y)), dtype=float)
         # if self._hexagonal:
@@ -121,19 +137,13 @@ class NeuralMap:
             # se inicializan las pocisiones relativas de los nodos en la posición "fija" que cada uno tiene
             self._rp = self._cart_coord.copy()
         else:
-            rp = array(rp).astype(float)
-            if not rp.shape == (self._x, self._y, 2):
-                print("ERROR EN INGRESAR rp")
-            else:
-                self._rp = rp
+            self._rp = rp
 
-        self._current_epoch = 0
+        self._current_epoch = None
 
         self._unified_distance_matrix_cache = None
-        self._hdbscan_cache = [None] * self._x * self._y
 
-        # check if input metric is valid
-        self._distance(array([[0., 1.]]), array([[1., 2.], [3., 4.]]))
+        self._hdbscan_cache = [(None, None, None)] * self._x * self._y
 
     def pca_weights_init(self, data):
         """Initializes the weights to span the first two principal components.
@@ -146,8 +156,7 @@ class NeuralMap:
             msg = 'The data needs at least 2 features for pca initialization'
             raise ValueError(msg)
         if self._x == 1 or self._y == 1:
-            print('PCA initialization inappropriate:' + \
-                  'One of the dimensions of the map is 1.')
+            print('PCA initialization inappropriate: One of the dimensions of the map is 1.')
 
         pc_length, pc = eig(cov(transpose(data)))
         pc_order = argsort(-pc_length)
@@ -179,8 +188,7 @@ class NeuralMap:
               learning_rate_decay_function='linear',
               radius_decay_function='linear',
               neighbourhood_function='gaussian',
-              verbosity=True,
-              plot_update=False):
+              verbosity=True):
 
         # si no se ingresó un rado inicial...
         if initial_radius is None:
@@ -196,80 +204,58 @@ class NeuralMap:
         self._unified_distance_matrix_cache = None
         self._hdbscan_cache = [None] * self._x * self._y
 
-        if isinstance(learning_rate_decay_function, str):
-            if not learning_rate_decay_function in _decay_functions.decay_functions:
-                raise TypeError(
-                    '{learning_rate_decay_function} is not an accepted distance metric. Should be {valid_decay_functions}!'
-                        .format(learning_rate_decay_function=learning_rate_decay_function,
-                                valid_decay_functions=_decay_functions.decay_functions)
-                )
-            if learning_rate_decay_function == 'linear':
-                learning_rate_decay_function = _decay_functions.linear
-            elif learning_rate_decay_function == 'exponential':
-                learning_rate_decay_function = _decay_functions.exponential
-            elif learning_rate_decay_function == 'rational':
-                learning_rate_decay_function = _decay_functions.rational
-            elif learning_rate_decay_function == 'no_decay':
-                learning_rate_decay_function = _decay_functions.no_decay
-            else:
-                print(learning_rate_decay_function, ' decay function is not available')
+        if learning_rate_decay_function == 'linear':
+            learning_rate_decay_function = _decay_functions.linear
+        elif learning_rate_decay_function == 'exponential':
+            learning_rate_decay_function = _decay_functions.exponential
+        elif learning_rate_decay_function == 'rational':
+            learning_rate_decay_function = _decay_functions.rational
+        elif learning_rate_decay_function == 'no_decay':
+            learning_rate_decay_function = _decay_functions.no_decay
 
-        if isinstance(radius_decay_function, str):
-            if not radius_decay_function in _decay_functions.decay_functions:
-                raise TypeError(
-                    '{radius_decay_function} is not an accepted distance metric. Should be {valid_decay_functions}!'
-                        .format(radius_decay_function=radius_decay_function,
-                                valid_decay_functions=_decay_functions.decay_functions)
-                )
-            if radius_decay_function == 'linear':
-                radius_decay_function = _decay_functions.linear
-            elif radius_decay_function == 'exponential':
-                radius_decay_function = _decay_functions.exponential
-            elif radius_decay_function == 'rational':
-                radius_decay_function = _decay_functions.rational
-            elif radius_decay_function == 'no_decay':
-                radius_decay_function = _decay_functions.no_decay
-            else:
-                print(radius_decay_function, ' decay function is not available')
+        if radius_decay_function == 'linear':
+            radius_decay_function = _decay_functions.linear
+        elif radius_decay_function == 'exponential':
+            radius_decay_function = _decay_functions.exponential
+        elif radius_decay_function == 'rational':
+            radius_decay_function = _decay_functions.rational
+        elif radius_decay_function == 'no_decay':
+            radius_decay_function = _decay_functions.no_decay
 
-        if isinstance(neighbourhood_function, str):
-            if not neighbourhood_function in _neighbourhood_functions.neighbourhood_functions:
-                raise TypeError(
-                    '{neighbourhood_function} is not an accepted distance metric. Should be {valid_neighbourhood_functions}!'
-                        .format(neighbourhood_function=neighbourhood_function,
-                                valid_neighbourhood_functions=_neighbourhood_functions.neighbourhood_functions)
-                )
-
-            if neighbourhood_function == 'bubble':
-                neighbourhood_function = _neighbourhood_functions.bubble
-            elif neighbourhood_function == 'conical':
-                neighbourhood_function = _neighbourhood_functions.conical
-            elif neighbourhood_function == 'gaussian':
-                neighbourhood_function = _neighbourhood_functions.gaussian
-            elif neighbourhood_function == 'gaussian_cut':
-                neighbourhood_function = _neighbourhood_functions.gaussian_cut
-            elif neighbourhood_function == 'mexican_hat':
-                neighbourhood_function = _neighbourhood_functions.mexican_hat
-            elif neighbourhood_function == 'no_neighbourhood':
-                neighbourhood_function = _neighbourhood_functions.no_neighbourhood
-            else:
-                print(neighbourhood_function, ' neighbourhood function is not available')
+        if neighbourhood_function == 'bubble':
+            neighbourhood_function = _neighbourhood_functions.bubble
+        elif neighbourhood_function == 'conical':
+            neighbourhood_function = _neighbourhood_functions.conical
+        elif neighbourhood_function == 'gaussian':
+            neighbourhood_function = _neighbourhood_functions.gaussian
+        elif neighbourhood_function == 'gaussian_cut':
+            neighbourhood_function = _neighbourhood_functions.gaussian_cut
+        elif neighbourhood_function == 'mexican_hat':
+            neighbourhood_function = _neighbourhood_functions.mexican_hat
+        elif neighbourhood_function == 'no_neighbourhood':
+            neighbourhood_function = _neighbourhood_functions.no_neighbourhood
 
         # se checkean los datos ingresados
-        _check_inputs.np_matrix(data)
-        _check_inputs.data_to_analyze(data, self._z)
+        _check_inputs.np_matrix(data, self._z)
         if eval_data is not None:
-            _check_inputs.np_matrix(eval_data)
-            _check_inputs.data_to_analyze(eval_data, self._z)
+            _check_inputs.np_matrix(eval_data, self._z)
+
         _check_inputs.value_type(num_epochs, int)
         _check_inputs.positive(num_epochs)
+
         _check_inputs.value_type(initial_learning_rate, float)
+        _check_inputs.positive(initial_learning_rate)
         _check_inputs.value_type(final_learning_rate, float)
+        _check_inputs.positive(final_learning_rate)
         _check_inputs.value_type(initial_radius, float)
+        _check_inputs.positive(initial_radius)
         _check_inputs.value_type(final_radius, float)
-        _check_inputs.function(learning_rate_decay_function, 4)
-        _check_inputs.function(radius_decay_function, 4)
-        # _check_inputs.function(neighbourhood_function, 3)
+        _check_inputs.positive(final_radius)
+
+        _check_inputs.function(learning_rate_decay_function)
+        _check_inputs.function(radius_decay_function)
+        _check_inputs.function(neighbourhood_function)
+
         _check_inputs.value_type(verbosity, bool)
 
         if weights_init_method == 'standard':
@@ -294,68 +280,76 @@ class NeuralMap:
         # se configura el estado aleatorio en base a la semilla calculada en el constructor
         random.seed(self._seed)
 
+        #############################
+
         # se declara el arreglo que va a contener las dimensiones del mapa
         xy = array([self._width, self._height])
 
-        if self._toroidal:
+        # se declara la posición del centro del mapa
+        center = (self._x // 2, self._y // 2)
 
-            # se declara la posición del centro del mapa
-            center = (self._x // 2, self._y // 2)
+        # se declara la lista sobre la que se va a almacenar el desplazamiento horizontal de cada itereación
+        hor_disp = zeros(self._y, dtype='int')
 
-            # se declara la lista sobre la que se va a almacenar el desplazamiento horizontal de cada itereación
-            hor_disp = zeros(self._y, dtype='int')
+        # se declara la lista sobre la que se va a almacenar el desplazamiento vertical de cada itereación
+        ver_disp = zeros(self._x, dtype='int')
 
-            # se declara la lista sobre la que se va a almacenar el desplazamiento vertical de cada itereación
-            ver_disp = zeros(self._x, dtype='int')
+        # se almcenan en una variable los índices de la mariz g
+        all_idcs = ogrid[[slice(0, self._x), slice(0, self._y)]]
 
-            # se almcenan en una variable los índices de la mariz g
-            all_idcs = ogrid[[slice(0, self._x), slice(0, self._y)]]
+        # se inicializa con ceros la lista de correcciones en las posiciones de los nodos
+        correction = zeros(self._y, dtype='int')
 
-            # se inicializa con ceros la lista de correcciones en las posiciones de los nodos
-            correction = zeros(self._y, dtype='int')
+        # se calcula la corrección que debe tener cada fila cuando el bmu está defasado del centro
+        correction[center[1] % 2:: 2] = (center[1] % 2) * 2 - 1
 
-            # se calcula la corrección que debe tener cada fila cuando el bmu está defasado del centro
-            correction[center[1] % 2:: 2] = (center[1] % 2) * 2 - 1
+        #############################
 
-            # por cada época...
-            for epoch in range(num_epochs):
+        plot_update = False
 
-                # ... se mezclan nuevamente las iteraciones
-                random.shuffle(iterations)
+        # por cada época...
+        for epoch in range(num_epochs):
 
-                # se genera un nuevo estado aleatorio
-                random.seed(epoch)
+            # ... se mezclan nuevamente las iteraciones
+            random.shuffle(iterations)
 
-                # se calcula la Learning Rate de la época
-                learning_rate = learning_rate_decay_function(initial_learning_rate, final_learning_rate, num_epochs,
-                                                             epoch)
+            # se genera un nuevo estado aleatorio
+            random.seed(epoch)
 
-                # se calcula el Radius de la época
-                radius = radius_decay_function(initial_radius, final_radius, num_epochs, epoch)
+            # se calcula la Learning Rate de la época
+            learning_rate = learning_rate_decay_function(initial_learning_rate, final_learning_rate, num_epochs,
+                                                         epoch)
 
-                self._current_epoch = epoch
+            # se calcula el Radius de la época
+            radius = radius_decay_function(initial_radius, final_radius, num_epochs, epoch)
 
-                if verbosity:
-                    # se imprime el progreso
-                    print('\nEpoch: ', epoch + 1, ' of ', num_epochs,
-                          '    Learning rate: ', learning_rate,
-                          '    Radius: ', radius)
+            self._current_epoch = epoch
 
-                pr = plot_update
+            if verbosity:
+                # se imprime el progreso
+                print('\nEpoch: ', epoch + 1, ' of ', num_epochs,
+                      '    Learning rate: ', learning_rate,
+                      '    Radius: ', radius)
 
-                # plt.scatter(self._rp[..., 0], self._rp[..., 1])
-                # plt.show()
-                # plt.scatter((self._rp[..., 0] + self._width / 3) % self._width,
-                #             (self._rp[..., 1] + self._height / 3) % self._height)
-                # plt.show()
+            pr = plot_update
 
-                # para cada iteración...
-                for iteration in iterations:
-                    # ... se toma el dato correspondiente a la iteración
-                    d = data[iteration]
+            # plt.scatter(self._rp[..., 0], self._rp[..., 1])
+            # plt.show()
+            # plt.scatter((self._rp[..., 0] + self._width / 3) % self._width,
+            #             (self._rp[..., 1] + self._height / 3) % self._height)
+            # plt.show()
 
-                    # se calcula el nodo ganador, y su distancia con respecto al dato
-                    winner_node = self.winner(d)
+            g_centered = neighbourhood_function(self._cart_coord, self._cart_coord[center], radius, learning_rate)
+
+            # para cada iteración...
+            for iteration in iterations:
+                # ... se toma el dato correspondiente a la iteración
+                d = data[iteration]
+
+                # se calcula el nodo ganador, y su distancia con respecto al dato
+                winner_node = self.winner(d)
+
+                if self._toroidal:
 
                     # se calcula la cantidad de nodos horizontal que hay desde el centro del mapa al nodo ganador
                     u = winner_node[0] - center[0]
@@ -369,10 +363,6 @@ class NeuralMap:
                     # se llena con el valur v la lista de desplazamientos verticales
                     ver_disp.fill(v)
 
-                    # se calcula la matriz de actualizaciones
-                    # g = neighbourhood_function(self._cart_coord, center, radius) * learning_rate
-                    g = neighbourhood_function(self._cart_coord, self._cart_coord[center], radius, learning_rate)
-
                     '''La matriz de actualizaciones (g) calculada sobre el centro del mapa debe ser desplazada para 
                     que coincida con la bmu. De esta manera se logra emular un espacio toroidal. Para eso se 
                     reindexan los elementos del arreglo, restando de los índices originales (all_idcs) el 
@@ -383,14 +373,10 @@ class NeuralMap:
                     para asegurar que los nuevos índices se encuentren dentro de los límites.'''
 
                     # se reindexa la matriz g para que coincida con el nodo ganador
-                    g = g[tuple([
+                    g = g_centered[tuple([
                         (all_idcs[0] - (hor_disp + (self._hexagonal and v % 2) * correction)) % self._x,
                         (all_idcs[1] - ver_disp[:, None]) % self._y
                     ])]
-
-                    # se actualizan los pesos de la red
-                    # self._weights += einsum('ij, ijk->ijk', g, d - self._weights)
-                    self._weights += (d - self._weights) * g[..., None]
 
                     # se calcula la ubicación opuesta al nodo ganador
                     vert = (self._cart_coord[winner_node] + xy / 2) % xy
@@ -418,68 +404,30 @@ class NeuralMap:
                     # se corrige para que entre en las dimensiones del mapa
                     self._rp %= xy
 
-                if eval_data is not None:
-                    quantization_error[epoch], topographic_error[epoch] = self.evaluate(eval_data)
-
-
-        else:
-
-            # por cada época...
-            for epoch in range(num_epochs):
-
-                # ... se mezclan nuevamente las iteraciones
-                random.shuffle(iterations)
-
-                # se genera un nuevo estado aleatorio
-                random.seed(epoch)
-
-                # se calcula la Learning Rate de la época
-                learning_rate = learning_rate_decay_function(initial_learning_rate, final_learning_rate, num_epochs,
-                                                             epoch)
-
-                # se calcula el Radius de la época
-                radius = radius_decay_function(initial_radius, final_radius, num_epochs, epoch)
-
-                self._current_epoch = epoch
-
-                if verbosity:
-                    # se imprime el progreso
-                    print('\n\nEpoch: ', epoch + 1, ' of ', num_epochs,
-                          '    Learning rate: ', learning_rate,
-                          '    Radius: ', radius)
-
-                pr = plot_update
-
-                # para cada iteración...
-                for iteration in iterations:
-                    # ... se toma el dato correspondiente
-                    d = data[iteration]
-
-                    # se calcula el nodo ganador, y su distancia con respecto al dato
-                    winner_node = self._cart_coord[self.winner(d)]
+                else:
 
                     # se calcula la matriz de actualizaciones
-                    g = neighbourhood_function(self._cart_coord, winner_node, radius, learning_rate)
-
-                    # se actualizan los pesos de la red
-                    # self._weights += einsum('ij, ijk->ijk', g, d - self._weights)
-                    self._weights += (d - self._weights) * g[..., None]
+                    g = neighbourhood_function(self._cart_coord, self._cart_coord[winner_node], radius,
+                                               learning_rate)
 
                     # se calcula el desplazamiento que debe aplicarse a cada RP
                     # despl = einsum('ij, ijk->ijk', g, winner_node - self._rp)
-                    despl = (winner_node - self._rp) * g[..., None]
+                    despl = (self._cart_coord[winner_node] - self._rp) * g[..., None]
 
                     if pr:
                         pr = False
-                        _plot.update(self._cart_coord, self._hexagonal, g, xy, winner_node, self._rp, despl)
+                        _plot.update(self._cart_coord, self._hexagonal, g, xy, self._cart_coord[winner_node],
+                                     self._rp, despl)
                         plt.show()
 
                     # se actualiza la matriz de RP
                     self._rp += despl
 
-                # se calcula el promedio de la época
-                if eval_data is not None:
-                    quantization_error[epoch], topographic_error[epoch] = self.evaluate(eval_data)
+                # se actualizan los pesos de la red
+                self._weights += (d - self._weights) * g[..., None]
+
+            if eval_data is not None:
+                quantization_error[epoch], topographic_error[epoch] = self.evaluate(eval_data)
 
         if eval_data is not None:
             # se muestra el gráfico de la distancia promedio de los nodos ganadores por cada época
@@ -525,20 +473,11 @@ class NeuralMap:
         if self._unified_distance_matrix_cache is not None:
             return self._unified_distance_matrix_cache
 
-        adjacency_matrix = ones((self._x * self._y, self._x * self._y)) * nan
+        adjacency_matrix = zeros((self._x * self._y, self._x * self._y)) * nan
         fill_diagonal(adjacency_matrix, 0.)
 
-        # se declara la variable que indica las coordenadas relativas de los nodos adyacente
-        ij = [
-            [[(1, 0), (0, 1), (-1, 0), (0, -1)],
-             [(1, 0), (0, 1), (-1, 0), (0, -1)]],
-
-            [[(1, 0), (1, 1), (0, 1), (-1, 0), (0, -1), (1, -1)],
-             [(1, 0), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1)]]
-        ]
-
         # se calcula la cantidad de nodos adyacentes que tiene cada nodo
-        ady = len(ij[self._hexagonal][0])
+        ady = len(self._ij[0])
 
         # se inicializa la matriz de distancias unificadas con ceros
         um = zeros((self._x, self._y, 1 + ady))
@@ -553,22 +492,27 @@ class NeuralMap:
                 c = 0
 
                 # para cada tupla de coordenadas relativas al nodo...
-                for k, (i, j) in enumerate(ij[self._hexagonal][y % 2]):
+                for k, (i, j) in enumerate(self._ij[y % 2]):
 
-                    # ... si es topología toroidal
                     if self._toroidal:
-
-                        # ... obtiene el vector de pesos del vecino
                         neighbour = array([[self._weights[(x + i + self._x) % self._x, (y + j + self._y) % self._y]]])
+
+                    elif self._x > x + i >= 0 <= y + j < self._y:
+                        neighbour = array([[self._weights[x + i, y + j]]])
+
+                    else:
+                        neighbour = None
+
+                    if neighbour is not None:
 
                         # se calcula la distancia entre el nodo y su vecino
                         distance = self._distance(self._weights[x, y].reshape([1, -1]),
                                                   neighbour[0, 0].reshape([1, -1]))
 
-                        # se asigna la distancia calcular al valor que tiene la matriz para esa posición
+                        # se lo suma la distancia al valor que tiene la matriz para esa posición
                         um[x, y, k] = distance
 
-                        # se suma la distancia a la última posición, para el cálculo del promedio de distancias
+                        # se asigna la distancia calcular al valor que tiene la matriz para esa posición
                         um[x, y, ady] += distance
 
                         # se incrementa en 1 la cuenta de nodos adyacentes, para calcular el promedio
@@ -577,36 +521,9 @@ class NeuralMap:
                         adjacency_matrix[x * self._y + y, ((x + i + self._x) % self._x) * self._y + (
                                 y + j + self._y) % self._y] = distance
 
-                    # si es topología plana...
                     else:
-
-                        # ... si representa a un nodo que está adentro del mapa
-                        if self._x > x + i >= 0 <= y + j < self._y:
-
-                            # ... obtiene el vector de pesos del vecino
-                            neighbour = array([[self._weights[x + i, y + j]]])
-
-                            # se calcula la distancia entre el nodo y su vecino
-                            distance = self._distance(self._weights[x, y].reshape([1, -1]),
-                                                      neighbour[0, 0].reshape([1, -1]))
-
-                            # se lo suma la distancia al valor que tiene la matriz para esa posición
-                            um[x, y, k] = distance
-
-                            # se asigna la distancia calcular al valor que tiene la matriz para esa posición
-                            um[x, y, ady] += distance
-
-                            # se incrementa en 1 la cuenta de nodos adyacentes, para calcular el promedio
-                            c += 1
-
-                            adjacency_matrix[x * self._y + y, ((x + i + self._x) % self._x) * self._y + (
-                                    y + j + self._y) % self._y] = distance
-
-                        # si no representa a un nodo que está adentro del mapa...
-                        else:
-
-                            # ... se asigna nan a esa posición de la matriz
-                            um[x, y, k] = nan
+                        # ... se asigna nan a esa posición de la matriz
+                        um[x, y, k] = nan
 
                 # si el nodo tiene al menos un nodo adyacente...
                 if c > 0:
@@ -626,8 +543,7 @@ class NeuralMap:
     def analyse(self, data):
 
         # se checkea el conjunto de datos ingresado
-        _check_inputs.np_matrix(data)
-        _check_inputs.data_to_analyze(data, self._z)
+        _check_inputs.np_matrix(data, self._z)
 
         # se inicializa con ceros la matriz que representa la frecuencia de activación
         activation_frequency = zeros((self._x, self._y))
@@ -666,12 +582,17 @@ class NeuralMap:
 
     def map_aggregate_attachments(self, data, attachments, aggregation_function=None):
 
-        # se checkean el conjunto ded atos ingresados y los attachments
-        _check_inputs.np_matrix(data)
-        _check_inputs.data_to_analyze(data, self._z)
-        _check_inputs.attachments(data, attachments)
+        if aggregation_function is None:
+            aggregation_function = _identity
 
-        aggregate = empty((self._x, self._y)).tolist()
+        # se checkean el conjunto ded atos ingresados y los attachments
+        _check_inputs.np_matrix(data, self._z)
+        _check_inputs.attachments(data, attachments)
+        _check_inputs.function(aggregation_function)
+
+        aggregate = zeros((self._x, self._y)).tolist()
+        # aggregate = [[0.0] * self._y] * self._x
+
         w = {}
 
         for i in range(self._x):
@@ -679,13 +600,10 @@ class NeuralMap:
                 w[(i, j)] = []
 
         for d, a in zip(data, attachments):
-            w[self.winner(d)].append(a)
+            w[tuple(self.winner(d))].append(a)
 
         for k, item in w.items():
-            if aggregation_function is not None:
-                aggregate[k[0]][k[1]] = aggregation_function(item)
-            else:
-                aggregate[k[0]][k[1]] = item
+            aggregate[k[0]][k[1]] = aggregation_function(item)
 
         return array(aggregate)
 
@@ -702,6 +620,9 @@ class NeuralMap:
         # retorna los clusters y los centros
         return clusterer.labels_.reshape(self._x, self._y), clusterer.cluster_centers_
 
+    def _custom_metric(self, x, y):
+        return self._distance(array([x]), array([y]))
+
     def k_medoids(self, n_clusters=4):
 
         # se checkea la cantidad de clusters ingresada
@@ -712,7 +633,7 @@ class NeuralMap:
             metric = self._metric
 
         else:
-            metric = lambda x, y: self._metric(array([x]), array([y]), **self._kwargs)
+            metric = self._custom_metric
 
         # inicializa la instancia de KMedoids
         clusterer = KMedoids(n_clusters=n_clusters, init="k-medoids++", metric=metric).fit(
@@ -724,6 +645,7 @@ class NeuralMap:
     def hdbscan(self, min_cluster_size=3, plot_condensed_tree=True):
 
         _check_inputs.value_type(min_cluster_size, int)
+        _check_inputs.positive(min_cluster_size - 1)
         _check_inputs.value_type(plot_condensed_tree, bool)
 
         if self._hdbscan_cache[min_cluster_size] is not None:
@@ -737,35 +659,26 @@ class NeuralMap:
         probabilities = clusterer.probabilities_
         outlier_scores = clusterer.outlier_scores_
 
-        # if restrictive_conf and self._toroidal == False:
-        #   for i in [[0, 1, self._y], [self._y - 1, 2 * self._y - 2, 2 * self._y - 1], [-self._y, -self._y + 1, -2 * self._y], [-1, -2, -self._y - 1]]:
-        #     if labels[i[0]] == -1 and labels[i[1]] == labels[i[2]]:
-        #       labels[i[0]] = labels[i[1]]
-        #       probabilities[i[0]] = (probabilities[i[1]] + probabilities[i[2]]) / 2
-        #       outlier_scores[i[0]] = (outlier_scores[i[1]] + outlier_scores[i[2]]) / 2
+        # if restrictive_conf and self._toroidal == False: for i in [[0, 1, self._y], [self._y - 1, 2 * self._y - 2,
+        # 2 * self._y - 1], [-self._y, -self._y + 1, -2 * self._y], [-1, -2, -self._y - 1]]: if labels[i[0]] == -1
+        # and labels[i[1]] == labels[i[2]]: labels[i[0]] = labels[i[1]] probabilities[i[0]] = (probabilities[i[1]] +
+        # probabilities[i[2]]) / 2 outlier_scores[i[0]] = (outlier_scores[i[1]] + outlier_scores[i[2]]) / 2
 
         if plot_condensed_tree:
             clusterer.condensed_tree_.plot(select_clusters=True, label_clusters=True)
 
-        self._hdbscan_cache[min_cluster_size] = labels.reshape(self._x, self._y), probabilities.reshape(self._x,
-                                                                                                        self._y), outlier_scores.reshape(
-            self._x, self._y)
+        self._hdbscan_cache[min_cluster_size] = (
+            labels.reshape(self._x, self._y),
+            probabilities.reshape(self._x, self._y),
+            outlier_scores.reshape(self._x, self._y)
+        )
+
         return self._hdbscan_cache[min_cluster_size]
 
-    def evaluate(self, data, plot=False):
+    def evaluate(self, data):
 
         # se checkea el conjunto de datos ingresado
-        _check_inputs.np_matrix(data)
-        _check_inputs.data_to_analyze(data, self._z)
-
-        # se declara la variable que indica las coordenadas relativas de los nodos adyacente
-        ij = [
-            [[(1, 0), (0, 1), (-1, 0), (0, -1)],
-             [(1, 0), (0, 1), (-1, 0), (0, -1)]],
-
-            [[(1, 0), (1, 1), (0, 1), (-1, 0), (0, -1), (1, -1)],
-             [(1, 0), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1)]]
-        ]
+        _check_inputs.np_matrix(data, self._z)
 
         topographic_error = 0
         quantization_error = 0
@@ -785,7 +698,7 @@ class NeuralMap:
             error = 1
 
             # para cada tupla de coordenadas relativas al nodo...
-            for k, (i, j) in enumerate(ij[self._hexagonal][y % 2]):
+            for k, (i, j) in enumerate(self._ij[y % 2]):
 
                 if (
                         self._toroidal
@@ -801,13 +714,12 @@ class NeuralMap:
 
             topographic_error += error
 
-            #
-            if error and plot:
-                activation_map[f_bmu] = nan
-                activation_map[s_bmu] = nan
-                print('\n\n', index)
-                _plot.tiles(cart_coord=self._cart_coord, hexagonal=self._hexagonal, data=activation_map, size=5)
-                plt.show()
+            # if error:
+            #     activation_map[f_bmu] = nan
+            #     activation_map[s_bmu] = nan
+            #     print('\n\n', index)
+            #     _plot.tiles(cart_coord=self._cart_coord, hexagonal=self._hexagonal, data=activation_map, size=5)
+            #     plt.show()
 
         # retorna la matriz de distancia unificada
         return quantization_error / data.shape[0], topographic_error / data.shape[0]
@@ -837,6 +749,7 @@ class NeuralMap:
                       show_quantization_error=True, cluster=True, min_cluster_size=3, borders=True,
                       show_empty_nodes=True, size=10):
 
+        _check_inputs.value_type(show_quantization_error, bool)
         _check_inputs.value_type(cluster, bool)
         _check_inputs.value_type(min_cluster_size, int)
         _check_inputs.value_type(borders, bool)
@@ -848,15 +761,15 @@ class NeuralMap:
         distance_matrix = self.unified_distance_matrix()[1]
 
         if cluster:
-            clusters_labels = self.hdbscan(min_cluster_size=min_cluster_size, plot_condensed_tree=False)[0].reshape(
-                self._x * self._y)
+            clusters_labels = array(self.hdbscan(min_cluster_size=min_cluster_size, plot_condensed_tree=False))[
+                0
+            ].reshape(self._x * self._y)
 
-            # if restrictive_conf and self.toroidal == False:
-            #   for i in [[0, 1, self.y], [self.y - 1, 2 * self.y - 2, 2 * self.y - 1], [-self.y, -self.y + 1, -2 * self.y], [-1, -2, -self.y - 1]]:
-            #     if clusters_labels[i[0]] == -1 and clusters_labels[i[1]] == clusters_labels[i[2]]:
-            #       clusters_labels[i[0]] = clusters_labels[i[1]]
+            # if restrictive_conf and self.toroidal == False: for i in [[0, 1, self.y], [self.y - 1, 2 * self.y - 2,
+            # 2 * self.y - 1], [-self.y, -self.y + 1, -2 * self.y], [-1, -2, -self.y - 1]]: if clusters_labels[i[0]]
+            # == -1 and clusters_labels[i[1]] == clusters_labels[i[2]]: clusters_labels[i[0]] = clusters_labels[i[1]]
 
-            connection_matrix = ones(distance_matrix.shape) * nan
+            connection_matrix = zeros(distance_matrix.shape) * nan
             reverse_matrix = zeros(distance_matrix.shape)
 
             for i in range(distance_matrix.shape[0]):
@@ -878,31 +791,32 @@ class NeuralMap:
                           size=size)
 
         if labels is not None:
-            # TODO: checkear Types
-            Types = unique(labels)
+            types = unique(labels)
 
             def aggregation_function(item):
-                res = zeros(Types.shape[0])
+                res = zeros(types.shape[0])
                 c = Counter(item)
-                for k, Type in enumerate(Types):
+                for k, Type in enumerate(types):
                     res[k] = c[Type]
                 return res
 
             nodes_class = self.map_aggregate_attachments(data, labels, aggregation_function)
 
             if types_to_display is None:
-                selected_types = list(range(len(Types)))
                 _plot.bubbles(actfreq, self.rp, nodes_class, connection_matrix=connection_matrix, norm=False,
-                              labels=Types, title='RP-HDBSCAN   labels', cmap=plt.cm.get_cmap('hsv', len(Types) + 1),
+                              labels=types, title='RP-HDBSCAN   labels', cmap=plt.cm.get_cmap('hsv', len(types) + 1),
                               reverse_matrix=reverse_matrix, borders=borders, show_empty_nodes=show_empty_nodes,
                               size=size)
 
             else:
-                selected_types = where(isin(Types, types_to_display))[0]
+                selected_types = where(isin(types, types_to_display))[0]
+
+                _check_inputs.positive(len(selected_types))
+
                 _plot.bubbles(actfreq, self.rp, nodes_class[..., selected_types].reshape(
                     [actfreq.shape[0], actfreq.shape[1], len(selected_types)]), connection_matrix=connection_matrix,
-                              norm=False, labels=Types[selected_types], title='RP-HDBSCAN   labels',
-                              cmap=plt.cm.get_cmap('hsv', len(Types[selected_types]) + 1),
+                              norm=False, labels=types[selected_types], title='RP-HDBSCAN   labels',
+                              cmap=plt.cm.get_cmap('hsv', len(types[selected_types]) + 1),
                               reverse_matrix=reverse_matrix,
                               borders=borders, show_empty_nodes=show_empty_nodes, size=size)
 
@@ -917,6 +831,7 @@ class NeuralMap:
         _check_inputs.value_type(detailed, bool)
         _check_inputs.value_type(borders, bool)
         _check_inputs.value_type(size, int)
+        _check_inputs.positive(size)
 
         umatrix, distance_matrix = self.unified_distance_matrix()
 
@@ -929,6 +844,11 @@ class NeuralMap:
                         borders=borders, size=size)
 
     def plot_weight(self, scaler=None, weights_to_display=None, headers=None, borders=True, size=10):
+
+        _check_inputs.value_type(borders, bool)
+        _check_inputs.value_type(size, int)
+        _check_inputs.positive(size)
+
         if scaler is None:
             weights = self._weights.copy()
         else:
@@ -941,11 +861,20 @@ class NeuralMap:
         if headers is None:
             headers = weights_to_display
 
+        _check_inputs.attachments(weights_to_display, headers)
+
         for w in weights_to_display:
             _plot.tiles(self._cart_coord, self._hexagonal, weights[..., w], title=headers[w], borders=borders,
                         size=size)
 
     def plot_node_weight_vector(self, node_index=(0, 0), labels=None, bar=True, scatter=False, line=False):
+
+        _check_inputs.value_type(node_index, tuple)
+
+        _check_inputs.value_type(bar, bool)
+        _check_inputs.value_type(scatter, bool)
+        _check_inputs.value_type(line, bool)
+
         node = self._weights[node_index]
         plt.figure(figsize=(20, 5))
         if bar:
@@ -966,25 +895,27 @@ class NeuralMap:
 
     def plot_set_weight_vectors(self, cluster=None, labels=None, min_cluster_size=3, show_median=False, show_mean=True,
                                 show_lines=True):
-        l, probabilities, outlier_score = self.hdbscan(plot_condensed_tree=False, min_cluster_size=min_cluster_size)
-        values = self._weights.reshape([-1, self._z])
+
+        _check_inputs.value_type(show_median, bool)
+        _check_inputs.value_type(show_mean, bool)
+        _check_inputs.value_type(show_lines, bool)
+
+        hdbscan_labels = self.hdbscan(plot_condensed_tree=False, min_cluster_size=min_cluster_size)[0]
+
+        values = self._weights.reshape((-1, self._z))
         cluster_title = "Vectores de pesos de los nodos"
         alpha = 1.
 
         if cluster is not None:
-            values = values[(l == cluster).flatten()]
+            _check_inputs.value_type(cluster, int)
+            values = values[(hdbscan_labels == cluster).flatten()]
             cluster_title += ". Cluster " + str(cluster)
 
         if show_mean:
-            v_mean = values.mean(axis=0)
-            v_std = values.std(axis=0)
             alpha = 0.5
             cluster_title += '. Media, M + 2 std y M - 2 std'
 
         if show_median:
-            v_q1 = quantile(values, 0.25, axis=0)
-            v_q2 = quantile(values, 0.5, axis=0)
-            v_q3 = quantile(values, 0.75, axis=0)
             alpha = 0.5
             cluster_title += '. Mediana, Q1 y Q3'
 
@@ -996,6 +927,9 @@ class NeuralMap:
                 plt.plot(value, alpha=alpha / 2, zorder=-1)
 
         if show_median:
+            v_q1 = quantile(values, 0.25, axis=0)
+            v_q2 = quantile(values, 0.5, axis=0)
+            v_q3 = quantile(values, 0.75, axis=0)
             plt.scatter(list(range(self._z)), v_q2, color='black', s=50)
             plt.scatter(list(range(self._z)), v_q3, color='black', s=50)
             plt.scatter(list(range(self._z)), v_q1, color='black', s=50)
@@ -1005,6 +939,8 @@ class NeuralMap:
                 plt.plot(v_q1, color='black', lw=1, ls='--', zorder=-1)
 
         if show_mean:
+            v_mean = values.mean(axis=0)
+            v_std = values.std(axis=0)
             plt.scatter(list(range(self._z)), v_mean, color='black', s=50)
             plt.scatter(list(range(self._z)), v_mean + 2 * v_std, color='black', s=50)
             plt.scatter(list(range(self._z)), v_mean - 2 * v_std, color='black', s=50)

@@ -1,8 +1,6 @@
 from numba import jit, float64
 from numpy import empty, exp
 
-neighbourhood_functions = ['bubble', 'conical', 'gaussian', 'gaussian_cut', 'mexican_hat', 'no_neighbourhood']
-
 
 @jit(float64[:, :](float64[:, :, :], float64[:], float64, float64), nopython=True, fastmath=True)
 def bubble(cart_coord, bmu, radius, learning_rate):

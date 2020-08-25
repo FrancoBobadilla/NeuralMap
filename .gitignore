@@ -143,3 +143,4 @@ cython_debug/
 # Jupyter Notebook related folders
 /examples/.ipynb_checkpoints/
 /examples/datasets/
+/examples/BootstrapCCpy

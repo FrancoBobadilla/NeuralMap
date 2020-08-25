@@ -412,7 +412,10 @@ class NeuralMap:
 
                     # se calcula el desplazamiento que debe aplicarse a cada RP
                     # despl = einsum('ij, ijk->ijk', g, winner_node - self._rp)
+
                     despl = (self._cart_coord[winner_node] - self._rp) * g[..., None]
+                    # despl = (self._rp[winner_node] - self._rp) * g[..., None]
+                    # despl[winner_node] = (self._cart_coord[winner_node] - self._rp[winner_node]) * g[winner_node]
 
                     if pr:
                         pr = False

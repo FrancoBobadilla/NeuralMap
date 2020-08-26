@@ -47,14 +47,6 @@ class NeuralMap:
             # muestra al usuario la semilla generada
             print('seed: ', seed)
 
-        if weights is not None:
-            weights = array(weights).astype(float)
-            _check_inputs.shape(weights, (self._x, self._y, self._z))
-
-        if rp is not None:
-            rp = array(rp).astype(float)
-            _check_inputs.shape(rp, (self._x, self._y, self._z))
-
         # se checkean todos los datos ingresados
         _check_inputs.value_type(z, int)
         _check_inputs.positive(z)
@@ -87,6 +79,14 @@ class NeuralMap:
 
         # se configura la cantidad de elementos de los vectores de pesos de los nodos
         self._z = z
+
+        if weights is not None:
+            weights = array(weights).astype(float)
+            _check_inputs.ndarray_and_shape(weights, (self._x, self._y, self._z))
+
+        if rp is not None:
+            rp = array(rp).astype(float)
+            _check_inputs.ndarray_and_shape(rp, (self._x, self._y, self._z))
 
         # configura si la topología del mapa es hexagonal (o cuadrada)
         self._hexagonal = hexagonal
@@ -149,14 +149,11 @@ class NeuralMap:
         """Initializes the weights to span the first two principal components.
         This initialization doesn't depend on random processes and
         makes the training process converge faster.
-        It is strongly reccomended to normalize the data before initializing
+        It is strongly recomended to normalize the data before initializing
         the weights and use the same normalization for the training data.
         """
         if self._z == 1:
-            msg = 'The data needs at least 2 features for pca initialization'
-            raise ValueError(msg)
-        if self._x == 1 or self._y == 1:
-            print('PCA initialization inappropriate: One of the dimensions of the map is 1.')
+            raise ValueError('The data needs at least 2 features for pca initialization')
 
         pc_length, pc = eig(cov(transpose(data)))
         pc_order = argsort(-pc_length)
@@ -236,9 +233,9 @@ class NeuralMap:
             neighbourhood_function = _neighbourhood_functions.no_neighbourhood
 
         # se checkean los datos ingresados
-        _check_inputs.np_matrix(data, self._z)
+        _check_inputs.numpy_matrix(data, self._z)
         if eval_data is not None:
-            _check_inputs.np_matrix(eval_data, self._z)
+            _check_inputs.numpy_matrix(eval_data, self._z)
 
         _check_inputs.value_type(num_epochs, int)
         _check_inputs.positive(num_epochs)
@@ -546,7 +543,7 @@ class NeuralMap:
     def analyse(self, data):
 
         # se checkea el conjunto de datos ingresado
-        _check_inputs.np_matrix(data, self._z)
+        _check_inputs.numpy_matrix(data, self._z)
 
         # se inicializa con ceros la matriz que representa la frecuencia de activación
         activation_frequency = zeros((self._x, self._y))
@@ -589,8 +586,8 @@ class NeuralMap:
             aggregation_function = _identity
 
         # se checkean el conjunto ded atos ingresados y los attachments
-        _check_inputs.np_matrix(data, self._z)
-        _check_inputs.attachments(data, attachments)
+        _check_inputs.numpy_matrix(data, self._z)
+        _check_inputs.length(data, attachments)
         _check_inputs.function(aggregation_function)
 
         aggregate = zeros((self._x, self._y)).tolist()
@@ -681,7 +678,7 @@ class NeuralMap:
     def evaluate(self, data):
 
         # se checkea el conjunto de datos ingresado
-        _check_inputs.np_matrix(data, self._z)
+        _check_inputs.numpy_matrix(data, self._z)
 
         topographic_error = 0
         quantization_error = 0
@@ -789,7 +786,7 @@ class NeuralMap:
             reverse_matrix = None
 
         if show_quantization_error:
-            _plot.bubbles(actfreq, self.rp, q, connection_matrix=connection_matrix, reverse_matrix=reverse_matrix,
+            _plot.bubbles(actfreq, self.rp, q, connections=connection_matrix, reverse=reverse_matrix,
                           title='RP-HDSCAN   quantization error', borders=borders, show_empty_nodes=show_empty_nodes,
                           size=size)
 
@@ -806,9 +803,9 @@ class NeuralMap:
             nodes_class = self.map_aggregate_attachments(data, labels, aggregation_function)
 
             if types_to_display is None:
-                _plot.bubbles(actfreq, self.rp, nodes_class, connection_matrix=connection_matrix, norm=False,
-                              labels=types, title='RP-HDBSCAN   labels', cmap=plt.cm.get_cmap('hsv', len(types) + 1),
-                              reverse_matrix=reverse_matrix, borders=borders, show_empty_nodes=show_empty_nodes,
+                _plot.bubbles(actfreq, self.rp, nodes_class, connections=connection_matrix, norm=False,
+                              labels=types, title='RP-HDBSCAN   labels', color_map=plt.cm.get_cmap('hsv', len(types) + 1),
+                              reverse=reverse_matrix, borders=borders, show_empty_nodes=show_empty_nodes,
                               size=size)
 
             else:
@@ -817,16 +814,16 @@ class NeuralMap:
                 _check_inputs.positive(len(selected_types))
 
                 _plot.bubbles(actfreq, self.rp, nodes_class[..., selected_types].reshape(
-                    [actfreq.shape[0], actfreq.shape[1], len(selected_types)]), connection_matrix=connection_matrix,
+                    [actfreq.shape[0], actfreq.shape[1], len(selected_types)]), connections=connection_matrix,
                               norm=False, labels=types[selected_types], title='RP-HDBSCAN   labels',
-                              cmap=plt.cm.get_cmap('hsv', len(types[selected_types]) + 1),
-                              reverse_matrix=reverse_matrix,
+                              color_map=plt.cm.get_cmap('hsv', len(types[selected_types]) + 1),
+                              reverse=reverse_matrix,
                               borders=borders, show_empty_nodes=show_empty_nodes, size=size)
 
         if attached_values is not None:
             nodes_values = self.map_aggregate_attachments(data, attached_values, func)
-            _plot.bubbles(actfreq, self.rp, nodes_values, connection_matrix=connection_matrix, norm=True,
-                          title='RP-HDBSCAN   attached values', reverse_matrix=reverse_matrix, borders=borders,
+            _plot.bubbles(actfreq, self.rp, nodes_values, connections=connection_matrix, norm=True,
+                          title='RP-HDBSCAN   attached values', reverse=reverse_matrix, borders=borders,
                           show_empty_nodes=show_empty_nodes, size=size)
 
     def plot_u_matrix(self, detailed=True, borders=True, size=10):
@@ -864,7 +861,7 @@ class NeuralMap:
         if headers is None:
             headers = weights_to_display
 
-        _check_inputs.attachments(weights_to_display, headers)
+        _check_inputs.length(weights_to_display, headers)
 
         for w in weights_to_display:
             _plot.tiles(self._cart_coord, self._hexagonal, weights[..., w], title=headers[w], borders=borders,
@@ -1063,7 +1060,7 @@ class NeuralMap:
 
     @weights.setter
     def weights(self, weights):
-        if _check_inputs.shape(weights, self._weights.shape):
+        if _check_inputs.ndarray_and_shape(weights, self._weights.shape):
             self._unified_distance_matrix_cache = None
             self._hdbscan_cache = [None] * self._x * self._y
             self._weights = weights

@@ -1,12 +1,11 @@
 from matplotlib.patches import Polygon, RegularPolygon, Circle, Wedge, Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from matplotlib import cm, colorbar, colors, pyplot as plt
-from numpy import ones, nanmax, nanmin, arange, sin, pi, ndarray, isnan, unravel_index, sqrt
+from matplotlib import colorbar, colors, pyplot as plt
+from numpy import ones, nanmax, nanmin, arange, pi, ndarray, isnan, unravel_index, sqrt
 
 
-def update(cart_coord, hexagonal, data, xy, winner_node, rp, despl):
-    cmap = cm.RdYlGn_r
-
+def update(positions, hexagonal, data, dimensions, bmu_position, relative_positions, displacement,
+           color_map=plt.cm.get_cmap('RdYlGn_r')):
     data_c = data.copy()
     data_max = nanmax(data_c)
     data_min = nanmin(data_c)
@@ -18,56 +17,54 @@ def update(cart_coord, hexagonal, data, xy, winner_node, rp, despl):
     data_c -= data_min
     data_c /= data_max - data_min
 
-    xrange = arange(cart_coord.shape[0])
-    yrange = arange(cart_coord.shape[1])
+    x_range = arange(positions.shape[0])
+    y_range = arange(positions.shape[1])
 
     f = plt.figure(figsize=(5, 5))
     ax = f.add_subplot(111)
     ax.set_aspect('equal')
 
-    ax_cb = make_axes_locatable(ax).new_horizontal(size="5%", pad=0.25)
-
     if hexagonal:
-        numVertices = 6
-        radius = sin(pi / 3) * 2 / 3
+        num_vertices = 6
+        radius = (3 ** 0.5) / 3
         orientation = 0
-        ax.set_xticks(xrange)
-        ax.set_yticks(yrange * sin(pi / 3))
+        ax.set_xticks(x_range)
+        ax.set_yticks(y_range * (3 ** 0.5) / 2)
 
     else:
-        numVertices = 4
-        radius = sin(pi / 4)
+        num_vertices = 4
+        radius = (2 ** 0.5) / 2
         orientation = pi / 4
-        ax.set_xticks(xrange)
-        ax.set_yticks(yrange)
+        ax.set_xticks(x_range)
+        ax.set_yticks(y_range)
 
-    # ax.set_xticklabels(xrange)
-    # ax.set_yticklabels(yrange)
+    ax.set_xticklabels(x_range)
+    ax.set_yticklabels(y_range)
 
     for i in range(data_c.shape[0]):
         for j in range(data_c.shape[1]):
             ax.add_patch(
-                RegularPolygon(cart_coord[i, j], numVertices=numVertices, radius=radius, orientation=orientation,
-                               facecolor=cmap(data_c[i, j]), edgecolor=cmap(data_c[i, j])))
+                RegularPolygon(positions[i, j], numVertices=num_vertices, radius=radius, orientation=orientation,
+                               facecolor=color_map(data_c[i, j]), edgecolor=color_map(data_c[i, j])))
 
-    ax.add_patch(Circle(winner_node, radius=radius / 3, facecolor='white', edgecolor='white'))
-    ax.add_patch(Circle((winner_node + xy / 2) % xy, radius=radius / 3, facecolor='black', edgecolor='black'))
-    ax.quiver(rp[..., 0], rp[..., 1], despl[..., 0], despl[..., 1], angles='xy', scale_units='xy', scale=1, zorder=10)
+    ax.add_patch(Circle(bmu_position, radius=radius / 3, facecolor='white', edgecolor='white'))
+    ax.add_patch(
+        Circle((bmu_position + dimensions / 2) % dimensions, radius=radius / 3, facecolor='black', edgecolor='black'))
+    ax.quiver(relative_positions[..., 0], relative_positions[..., 1], displacement[..., 0], displacement[..., 1],
+              angles='xy', scale_units='xy', scale=1, zorder=10)
 
-    ax.plot(cart_coord[..., 0].max(), cart_coord[..., 1].max(), ' ', alpha=0)
-    ax.plot(cart_coord[..., 0].min(), cart_coord[..., 1].min(), ' ', alpha=0)
-
-    colorbar.ColorbarBase(ax_cb, cmap=cmap, orientation='vertical', norm=colors.Normalize(vmin=data_min, vmax=data_max))
-    f.add_axes(ax_cb)
+    legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
+                  [positions[..., 0].min(), positions[..., 1].min()],
+                  data_min, data_max, color_map, f, ax)
 
 
-def tiles(cart_coord, hexagonal, data, cmap=cm.RdYlGn_r, size=10, borders=False, norm=True, labels=None,
-          intensity=None, title=None):
+def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, borders=False, norm=True,
+          labels=None, intensity=None, title=None):
     if intensity is None:
-        intensity = ones((cart_coord.shape[0], cart_coord.shape[1]))
+        intensity = ones((positions.shape[0], positions.shape[1]))
 
     if labels is not None:
-        cmap = plt.cm.get_cmap('hsv', len(labels) + 1)
+        color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
 
     data_c = data.copy()
     data_max = nanmax(data_c)
@@ -82,126 +79,124 @@ def tiles(cart_coord, hexagonal, data, cmap=cm.RdYlGn_r, size=10, borders=False,
         data_c -= data_min
         data_c /= data_max - data_min
 
-    xrange = arange(cart_coord.shape[0])
-    yrange = arange(cart_coord.shape[1])
+    x_range = arange(positions.shape[0])
+    y_range = arange(positions.shape[1])
 
     f = plt.figure(figsize=(size, size))
     ax = f.add_subplot(111)
     ax.set_aspect('equal')
 
-    ax_cb = make_axes_locatable(ax).new_horizontal(size="5%", pad=0.25)
-
     if title is not None:
         ax.title.set_text(title)
 
     if hexagonal:
-        numVertices = 6
-        radius = sin(pi / 3) * 2 / 3
+        num_vertices = 6
+        radius = (3 ** 0.5) / 3
         orientation = 0
-        ax.set_xticks(xrange + 0.25)
-        ax.set_yticks(yrange * sin(pi / 3))
+        ax.set_xticks(x_range + 0.25)
+        ax.set_yticks(y_range * (3 ** 0.5) / 2)
 
     else:
-        numVertices = 4
-        radius = sin(pi / 4)
+        num_vertices = 4
+        radius = (2 ** 0.5) / 2
         orientation = pi / 4
-        ax.set_xticks(xrange)
-        ax.set_yticks(yrange)
+        ax.set_xticks(x_range)
+        ax.set_yticks(y_range)
 
     a = radius / 2
 
-    ax.set_xticklabels(xrange)
-    ax.set_yticklabels(yrange)
+    ax.set_xticklabels(x_range)
+    ax.set_yticklabels(y_range)
 
     for i in range(data_c.shape[0]):
         for j in range(data_c.shape[1]):
             if type(data_c[i, j]) is ndarray:
-                wx = cart_coord[(i, j, 0)]
-                wy = cart_coord[(i, j, 1)]
+                wx = positions[(i, j, 0)]
+                wy = positions[(i, j, 1)]
                 if hexagonal:
                     if not isnan(data_c[i, j, 0]):
                         ax.add_patch(Polygon(
                             ([(wx + .25, wy - a / 2), (wx + .25, wy + a / 2), (wx + .5, wy + a), (wx + .5, wy - a)]),
-                            facecolor=cmap(data_c[i, j, 0]), edgecolor=cmap(data_c[i, j, 0]), alpha=intensity[i, j]))
+                            facecolor=color_map(data_c[i, j, 0]), edgecolor=color_map(data_c[i, j, 0]),
+                            alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 1]):
                         ax.add_patch(
                             Polygon(([(wx + .25, wy + a / 2), (wx, wy + a), (wx, wy + 2 * a), (wx + .5, wy + a)]),
-                                    facecolor=cmap(data_c[i, j, 1]), edgecolor=cmap(data_c[i, j, 1]),
+                                    facecolor=color_map(data_c[i, j, 1]), edgecolor=color_map(data_c[i, j, 1]),
                                     alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 2]):
                         ax.add_patch(
                             Polygon(([(wx, wy + a), (wx - .25, wy + a / 2), (wx - .5, wy + a), (wx, wy + 2 * a)]),
-                                    facecolor=cmap(data_c[i, j, 2]), edgecolor=cmap(data_c[i, j, 2]),
+                                    facecolor=color_map(data_c[i, j, 2]), edgecolor=color_map(data_c[i, j, 2]),
                                     alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 3]):
                         ax.add_patch(Polygon(
                             ([(wx - .25, wy + a / 2), (wx - .25, wy - a / 2), (wx - .5, wy - a), (wx - .5, wy + a)]),
-                            facecolor=cmap(data_c[i, j, 3]), edgecolor=cmap(data_c[i, j, 3]), alpha=intensity[i, j]))
+                            facecolor=color_map(data_c[i, j, 3]), edgecolor=color_map(data_c[i, j, 3]),
+                            alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 4]):
                         ax.add_patch(
                             Polygon(([(wx - .25, wy - a / 2), (wx, wy - a), (wx, wy - 2 * a), (wx - .5, wy - a)]),
-                                    facecolor=cmap(data_c[i, j, 4]), edgecolor=cmap(data_c[i, j, 4]),
+                                    facecolor=color_map(data_c[i, j, 4]), edgecolor=color_map(data_c[i, j, 4]),
                                     alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 5]):
                         ax.add_patch(
                             Polygon(([(wx, wy - a), (wx + .25, wy - a / 2), (wx + .5, wy - a), (wx, wy - 2 * a)]),
-                                    facecolor=cmap(data_c[i, j, 5]), edgecolor=cmap(data_c[i, j, 5]),
+                                    facecolor=color_map(data_c[i, j, 5]), edgecolor=color_map(data_c[i, j, 5]),
                                     alpha=intensity[i, j]))
                 else:
                     if not isnan(data_c[i, j, 0]):
                         ax.add_patch(Polygon(
                             ([(wx + .25, wy - .25), (wx + .5, wy - .5), (wx + .5, wy + .5), (wx + .25, wy + .25)]),
-                            facecolor=cmap(data_c[i, j, 0]), edgecolor=cmap(data_c[i, j, 0]), alpha=intensity[i, j]))
+                            facecolor=color_map(data_c[i, j, 0]), edgecolor=color_map(data_c[i, j, 0]),
+                            alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 1]):
                         ax.add_patch(Polygon(
                             ([(wx + .5, wy + .5), (wx + .25, wy + .25), (wx - .25, wy + .25), (wx - .5, wy + .5)]),
-                            facecolor=cmap(data_c[i, j, 1]), edgecolor=cmap(data_c[i, j, 1]), alpha=intensity[i, j]))
+                            facecolor=color_map(data_c[i, j, 1]), edgecolor=color_map(data_c[i, j, 1]),
+                            alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 2]):
                         ax.add_patch(Polygon(
                             ([(wx - .25, wy + .25), (wx - .5, wy + .5), (wx - .5, wy - .5), (wx - .25, wy - .25)]),
-                            facecolor=cmap(data_c[i, j, 2]), edgecolor=cmap(data_c[i, j, 2]), alpha=intensity[i, j]))
+                            facecolor=color_map(data_c[i, j, 2]), edgecolor=color_map(data_c[i, j, 2]),
+                            alpha=intensity[i, j]))
                     if not isnan(data_c[i, j, 3]):
                         ax.add_patch(Polygon(
                             ([(wx - .5, wy - .5), (wx - .25, wy - .25), (wx + .25, wy - .25), (wx + .5, wy - .5)]),
-                            facecolor=cmap(data_c[i, j, 3]), edgecolor=cmap(data_c[i, j, 3]), alpha=intensity[i, j]))
+                            facecolor=color_map(data_c[i, j, 3]), edgecolor=color_map(data_c[i, j, 3]),
+                            alpha=intensity[i, j]))
 
-                if not isnan(data_c[i, j, numVertices]):
-                    ax.add_patch(RegularPolygon((wx, wy), numVertices=numVertices, radius=a, orientation=orientation,
-                                                facecolor=cmap(data_c[i, j, numVertices]),
-                                                edgecolor=cmap(data_c[i, j, numVertices]), alpha=intensity[i, j]))
+                if not isnan(data_c[i, j, num_vertices]):
+                    ax.add_patch(RegularPolygon((wx, wy), numVertices=num_vertices, radius=a, orientation=orientation,
+                                                facecolor=color_map(data_c[i, j, num_vertices]),
+                                                edgecolor=color_map(data_c[i, j, num_vertices]), alpha=intensity[i, j]))
                 if borders:
                     ax.add_patch(
-                        RegularPolygon((wx, wy), numVertices=numVertices, radius=radius, orientation=orientation,
+                        RegularPolygon((wx, wy), numVertices=num_vertices, radius=radius, orientation=orientation,
                                        fill=0, edgecolor='black', alpha=intensity[i, j]))
 
             else:
                 if not isnan(data_c[i, j]):
                     if borders:
-                        edgecolor = 'black'
+                        edge_color = 'black'
                     else:
-                        edgecolor = cmap(data_c[i, j])
-                    ax.add_patch(RegularPolygon(cart_coord[i, j], numVertices=numVertices, radius=radius,
-                                                orientation=orientation, facecolor=cmap(data_c[i, j]),
-                                                edgecolor=edgecolor, alpha=intensity[i, j]))
+                        edge_color = color_map(data_c[i, j])
+                    ax.add_patch(RegularPolygon(positions[i, j], numVertices=num_vertices, radius=radius,
+                                                orientation=orientation, facecolor=color_map(data_c[i, j]),
+                                                edgecolor=edge_color, alpha=intensity[i, j]))
 
-    ax.plot(cart_coord[..., 0].max(), cart_coord[..., 1].max(), ' ', alpha=0)
-    ax.plot(cart_coord[..., 0].min(), cart_coord[..., 1].min(), ' ', alpha=0)
-
-    if labels is None:
-        colorbar.ColorbarBase(ax_cb, cmap=cmap, orientation='vertical',
-                              norm=colors.Normalize(vmin=data_min, vmax=data_max))
-        f.add_axes(ax_cb)
-    else:
-        ax.legend(bbox_to_anchor=(1, 1), handles=[Patch(color=cmap(k), label=label) for k, label in enumerate(labels)])
+    legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
+                  [positions[..., 0].min(), positions[..., 1].min()],
+                  data_min, data_max, color_map, f, ax, labels=labels)
 
 
-def bubbles(diameters, cart_coord, data, connection_matrix=None, reverse_matrix=None, norm=True, labels=None,
-            intensity=None, title='plot', cmap=cm.RdYlGn_r, size=10, borders=False, show_empty_nodes=True):
+def bubbles(diameters, positions, data, connections=None, reverse=None, norm=True, labels=None, intensity=None,
+            title=None, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, borders=False, show_empty_nodes=True):
     if intensity is None:
-        intensity = ones((cart_coord.shape[0], cart_coord.shape[1]))
+        intensity = ones((positions.shape[0], positions.shape[1]))
 
     if labels is not None:
-        cmap = plt.cm.get_cmap('hsv', len(labels) + 1)
+        color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
 
     d_max = diameters.max()
 
@@ -222,78 +217,85 @@ def bubbles(diameters, cart_coord, data, connection_matrix=None, reverse_matrix=
     ax = f.add_subplot(111)
     ax.set_aspect('equal')
 
-    ax_cb = make_axes_locatable(ax).new_horizontal(size="5%", pad=0.25)
+    if title is not None:
+        ax.title.set_text(title)
 
-    ax.title.set_text(title)
-
-    if connection_matrix is not None:
-        if reverse_matrix is None:
-            reverse_matrix = connection_matrix.copy() * 0
-        cm_min = nanmin(connection_matrix)
-        width = cart_coord[..., 0].max()
-        height = cart_coord[..., 1].max()
-        for i in range(connection_matrix.shape[0]):
-            for j in range(connection_matrix.shape[1]):
-                if not isnan(connection_matrix[i, j]):
-                    first_pos = cart_coord[unravel_index(i, (cart_coord.shape[0], cart_coord.shape[1]))].copy()
-                    second_pos = cart_coord[unravel_index(j, (cart_coord.shape[0], cart_coord.shape[1]))].copy()
-                    if reverse_matrix[i, j]:
-                        reversed = False
+    if connections is not None:
+        if reverse is None:
+            reverse = connections.copy() * 0
+        cm_min = nanmin(connections)
+        width = positions[..., 0].max()
+        height = positions[..., 1].max()
+        for i in range(connections.shape[0]):
+            for j in range(connections.shape[1]):
+                if not isnan(connections[i, j]):
+                    first_pos = positions[unravel_index(i, (positions.shape[0], positions.shape[1]))].copy()
+                    second_pos = positions[unravel_index(j, (positions.shape[0], positions.shape[1]))].copy()
+                    if reverse[i, j]:
+                        edges_connection = False
                         if first_pos[0] - second_pos[0] > width / 2:
-                            reversed = True
+                            edges_connection = True
                             second_pos[0] += 1 + width
                         if second_pos[0] - first_pos[0] > width / 2:
-                            reversed = True
+                            edges_connection = True
                             second_pos[0] -= 1 + width
                         if first_pos[1] - second_pos[1] > height / 2:
-                            reversed = True
+                            edges_connection = True
                             second_pos[1] += 1 + height
                         if second_pos[1] - first_pos[1] > height / 2:
-                            reversed = True
+                            edges_connection = True
                             second_pos[1] -= 1 + height
-                        if reversed:
+                        if edges_connection:
                             second_pos = (second_pos + first_pos) / 2
 
                     plt.plot([first_pos[0], second_pos[0]], [first_pos[1], second_pos[1]], zorder=-d_max * 2,
-                             color='black', alpha=(0.1 + cm_min / connection_matrix[i, j]) / 1.1)
+                             color='black', alpha=(0.1 + cm_min / connections[i, j]) / 1.1)
 
     for i in range(data_c.shape[0]):
         for j in range(data_c.shape[1]):
             if diameters[i, j] > 0:
                 if type(data_c[i, j]) is ndarray:
-                    init = 0
+                    start = 0
                     for k in range(data_c[i, j].shape[0]):
-                        next = init + data_c[i, j, k] * 360 / diameters[i, j]
+                        end = start + data_c[i, j, k] * 360 / diameters[i, j]
                         if data_c[i, j, k]:
-                            ax.add_patch(Wedge(cart_coord[i, j], r=sqrt(diameters[i, j] / d_max) / 3, theta1=init,
-                                               theta2=next, facecolor=cmap(k / data_c[i, j].shape[0]),
-                                               edgecolor=cmap(k / data_c[i, j].shape[0]), zorder=-diameters[i, j],
+                            ax.add_patch(Wedge(positions[i, j], r=sqrt(diameters[i, j] / d_max) / 3, theta1=start,
+                                               theta2=end, facecolor=color_map(k / data_c[i, j].shape[0]),
+                                               edgecolor=color_map(k / data_c[i, j].shape[0]), zorder=-diameters[i, j],
                                                alpha=intensity[i, j]))
-                        init = next
+                        start = end
                     if borders:
                         ax.add_patch(
-                            Circle(cart_coord[i, j], radius=sqrt(diameters[i, j] / d_max) / 3, facecolor='None',
+                            Circle(positions[i, j], radius=sqrt(diameters[i, j] / d_max) / 3, facecolor='None',
                                    edgecolor='black', zorder=-diameters[i, j], alpha=intensity[i, j]))
                 else:
                     if borders:
-                        edgecolor = 'black'
+                        edge_color = 'black'
                     else:
-                        edgecolor = cmap(data_c[i, j])
-                    ax.add_patch(Circle(cart_coord[i, j], radius=sqrt(diameters[i, j] / d_max) / 3,
-                                        facecolor=cmap(data_c[i, j]), edgecolor=edgecolor, zorder=-diameters[i, j],
+                        edge_color = color_map(data_c[i, j])
+                    ax.add_patch(Circle(positions[i, j], radius=sqrt(diameters[i, j] / d_max) / 3,
+                                        facecolor=color_map(data_c[i, j]), edgecolor=edge_color,
+                                        zorder=-diameters[i, j],
                                         alpha=intensity[i, j]))
             else:
                 if show_empty_nodes:
-                    ax.add_patch(RegularPolygon(cart_coord[i, j], numVertices=4, radius=sqrt(1 / d_max) / 3,
+                    ax.add_patch(RegularPolygon(positions[i, j], numVertices=4, radius=sqrt(1 / d_max) / 3,
                                                 facecolor='lightgrey', edgecolor='lightgrey', zorder=-d_max,
                                                 alpha=intensity[i, j]))
 
-    plt.plot(cart_coord[..., 0].max(), cart_coord[..., 1].max(), ' ', alpha=0)
-    plt.plot(cart_coord[..., 0].min(), cart_coord[..., 1].min(), ' ', alpha=0)
+    legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
+                  [positions[..., 0].min(), positions[..., 1].min()],
+                  data_min, data_max, color_map, f, ax, labels=labels)
 
+
+def legend_or_bar(position_max, position_min, data_min, data_max, color_map, f, ax, labels=None):
+    plt.plot(position_max[0], position_max[1], ' ', alpha=0)
+    plt.plot(position_min[0], position_min[1], ' ', alpha=0)
+    ax_cb = make_axes_locatable(ax).new_horizontal(size="5%", pad=0.25)
     if labels is None:
-        colorbar.ColorbarBase(ax_cb, cmap=cmap, orientation='vertical',
+        colorbar.ColorbarBase(ax_cb, cmap=color_map, orientation='vertical',
                               norm=colors.Normalize(vmin=data_min, vmax=data_max))
         f.add_axes(ax_cb)
     else:
-        ax.legend(bbox_to_anchor=(1, 1), handles=[Patch(color=cmap(k), label=label) for k, label in enumerate(labels)])
+        ax.legend(bbox_to_anchor=(1, 1),
+                  handles=[Patch(color=color_map(k), label=label) for k, label in enumerate(labels)])

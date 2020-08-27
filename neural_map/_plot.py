@@ -191,7 +191,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
 
 
 def bubbles(diameters, positions, data, connections=None, reverse=None, norm=True, labels=None, intensity=None,
-            title=None, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, borders=False, show_empty_nodes=True):
+            title=None, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, borders=False, display_empty_nodes=True):
     if intensity is None:
         intensity = ones((positions.shape[0], positions.shape[1]))
 
@@ -278,7 +278,7 @@ def bubbles(diameters, positions, data, connections=None, reverse=None, norm=Tru
                                         zorder=-diameters[i, j],
                                         alpha=intensity[i, j]))
             else:
-                if show_empty_nodes:
+                if display_empty_nodes:
                     ax.add_patch(RegularPolygon(positions[i, j], numVertices=4, radius=sqrt(1 / d_max) / 3,
                                                 facecolor='lightgrey', edgecolor='lightgrey', zorder=-d_max,
                                                 alpha=intensity[i, j]))

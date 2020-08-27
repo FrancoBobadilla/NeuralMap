@@ -135,7 +135,7 @@ class MetricDistanceTestCase(unittest.TestCase):
                              'exception raised while entering distance metric ' + str(case['metric']))
 
             if not exception_raised:
-                errors = abs(som.activate(case['reference']) - case['expected']).flatten()
+                errors = abs(som.generate_activation_map(case['reference']) - case['expected']).flatten()
                 for error in errors:
                     self.assertLessEqual(error, tolerance, 'wrong activation value in ' + str(case['metric']))
 
@@ -168,12 +168,12 @@ class MetricDistanceTestCase(unittest.TestCase):
                          'exception not raised while entering function distance metric')
 
 
-class CartCoordTestCase(unittest.TestCase):
+class PositionsTestCase(unittest.TestCase):
     def setUp(self):
         self.som = NeuralMap(z=5, x=7, y=10, hexagonal=True)
 
     def test_boundaries(self):
-        cart_coord = self.som.cart_coord.reshape(-1, 2)
+        positions = self.som.positions.reshape(-1, 2)
 
         left = 0.0
         right = self.som.x
@@ -183,37 +183,37 @@ class CartCoordTestCase(unittest.TestCase):
         if self.som.hexagonal:
             upper *= (3 ** 0.5) * 0.5  # relation between the apothem of an hexagon and its side length
 
-        for position in cart_coord:
+        for position in positions:
             self.assertGreaterEqual(position[0], left, 'left boundary crossed')
             self.assertLessEqual(position[0], right, 'right boundary crossed')
             self.assertGreaterEqual(position[1], lower, 'lower boundary crossed')
             self.assertLessEqual(position[1], upper, 'upper boundary crossed')
 
     def test_minimum_distance_between_nodes(self):
-        cart_coord = self.som.cart_coord.reshape(-1, 2)
-        for ref_position in cart_coord:
-            for comp_position in cart_coord:
+        positions = self.som.positions.reshape(-1, 2)
+        for ref_position in positions:
+            for comp_position in positions:
                 distance = euclidean(ref_position, comp_position)
                 if distance != 0:
                     self.assertLessEqual(1.0, distance + tolerance,
                                          'there are at least two nodes closer than they should')
 
     def test_index_position_consistency(self):
-        cart_coord = self.som.cart_coord // 1
-        for ref_i in range(cart_coord.shape[0]):
-            for ref_j in range(cart_coord.shape[1]):
-                for comp_i in range(cart_coord.shape[0]):
-                    for comp_j in range(cart_coord.shape[1]):
+        positions = self.som.positions // 1
+        for ref_i in range(positions.shape[0]):
+            for ref_j in range(positions.shape[1]):
+                for comp_i in range(positions.shape[0]):
+                    for comp_j in range(positions.shape[1]):
                         if ref_i == comp_i:
-                            self.assertEqual(cart_coord[ref_i, ref_j, 0], cart_coord[comp_i, comp_j, 0],
+                            self.assertEqual(positions[ref_i, ref_j, 0], positions[comp_i, comp_j, 0],
                                              'index consistency not preserved')
 
                         if ref_j == comp_j:
-                            self.assertEqual(cart_coord[ref_i, ref_j, 1], cart_coord[comp_i, comp_j, 1],
+                            self.assertEqual(positions[ref_i, ref_j, 1], positions[comp_i, comp_j, 1],
                                              'index consistency not preserved')
 
     def test_inner_adjacency(self):
-        cart_coord = self.som.cart_coord.reshape(-1, 2)
+        positions = self.som.positions.reshape(-1, 2)
 
         expected_inner_nodes = (self.som.x - 2) * (self.som.y - 2)
         if expected_inner_nodes < 0:
@@ -221,11 +221,11 @@ class CartCoordTestCase(unittest.TestCase):
 
         actual_inner_nodes = 0
 
-        for ref_position in cart_coord:
+        for ref_position in positions:
 
             adjacency_count = 0
 
-            for comp_position in cart_coord:
+            for comp_position in positions:
                 distance = euclidean(ref_position, comp_position)
                 if distance != 0 and distance <= 1.0 + tolerance:
                     adjacency_count += 1

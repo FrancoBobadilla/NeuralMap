@@ -7,7 +7,8 @@ def bubble(positions, bmu, radius, learning_rate):
     res = empty((positions.shape[0], positions.shape[1]), dtype=positions.dtype)
     for i in range(positions.shape[0]):
         for j in range(positions.shape[1]):
-            if ((positions[i, j, 0] - bmu[0]) ** 2 + (positions[i, j, 1] - bmu[1]) ** 2) / radius ** 2 < 1:
+            if ((positions[i, j, 0] - bmu[0]) ** 2 + (
+                    positions[i, j, 1] - bmu[1]) ** 2) / radius ** 2 < 1:
                 res[i, j] = learning_rate
             else:
                 res[i, j] = 0.
@@ -20,7 +21,7 @@ def conical(positions, bmu, radius, learning_rate):
     for i in range(positions.shape[0]):
         for j in range(positions.shape[1]):
             res[i, j] = max(0., 1. - (((positions[i, j, 0] - bmu[0]) ** 2 + (
-                    positions[i, j, 1] - bmu[1]) ** 2) ** 0.5) / radius) * learning_rate
+                        positions[i, j, 1] - bmu[1]) ** 2) ** 0.5) / radius) * learning_rate
     return res
 
 
@@ -29,8 +30,8 @@ def gaussian(positions, bmu, radius, learning_rate):
     res = empty((positions.shape[0], positions.shape[1]), dtype=positions.dtype)
     for i in range(positions.shape[0]):
         for j in range(positions.shape[1]):
-            res[i, j] = exp(-((positions[i, j, 0] - bmu[0]) ** 2 + (
-                    positions[i, j, 1] - bmu[1]) ** 2) / radius ** 2) * learning_rate
+            res[i, j] = exp(-((positions[i, j, 0] - bmu[0]) ** 2 +
+                              (positions[i, j, 1] - bmu[1]) ** 2) / radius ** 2) * learning_rate
     return res
 
 
@@ -39,7 +40,8 @@ def gaussian_cut(positions, bmu, radius, learning_rate):
     res = empty((positions.shape[0], positions.shape[1]), dtype=positions.dtype)
     for i in range(positions.shape[0]):
         for j in range(positions.shape[1]):
-            val = ((positions[i, j, 0] - bmu[0]) ** 2 + (positions[i, j, 1] - bmu[1]) ** 2) / radius ** 2
+            val = ((positions[i, j, 0] - bmu[0]) ** 2 + (positions[i, j, 1] - bmu[1]) ** 2) / \
+                  radius ** 2
             if val >= 1.:
                 res[i, j] = 0.
             else:
@@ -52,8 +54,9 @@ def mexican_hat(positions, bmu, radius, learning_rate):
     res = empty((positions.shape[0], positions.shape[1]), dtype=positions.dtype)
     for i in range(positions.shape[0]):
         for j in range(positions.shape[1]):
-            p = -((positions[i, j, 0] - bmu[0]) ** 2 + (positions[i, j, 1] - bmu[1]) ** 2) / radius ** 2
-            res[i, j] = exp(p) * (1. + p) * learning_rate
+            value = -((positions[i, j, 0] - bmu[0]) ** 2 + (positions[i, j, 1] - bmu[1]) ** 2) / \
+                    radius ** 2
+            res[i, j] = exp(value) * (1. + value) * learning_rate
     return res
 
 

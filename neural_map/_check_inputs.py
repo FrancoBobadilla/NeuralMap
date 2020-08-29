@@ -1,8 +1,8 @@
 from numpy import isinf, isnan, ndarray
 
 
-def length(x, y):
-    if len(x) != len(y):
+def length(first_array, second_array):
+    if len(first_array) != len(second_array):
         raise ValueError(
             'Input data and labels must have the same length.'
         )
@@ -50,7 +50,7 @@ def positive(value):
     if not value > 0:
         raise TypeError(
             'Value {value} should be positive!'
-            .format(value=value, value_type=type(value))
+            .format(value=value)
         )
 
     return True

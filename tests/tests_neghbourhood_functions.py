@@ -1,12 +1,12 @@
 import unittest
-from ..neural_map import bubble, conical, gaussian, gaussian_cut, mexican_hat, no_neighbourhood
 import numpy as np
+from ..neural_map import bubble, conical, gaussian, gaussian_cut, mexican_hat, no_neighbourhood
 
-tolerance = 1e-8
+TOLERANCE = 1e-8
 
 
-def euclidean(a, b):
-    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+def euclidean(f_element, s_element):
+    return ((f_element[0] - s_element[0]) ** 2 + (f_element[1] - s_element[1]) ** 2) ** 0.5
 
 
 cart_coord = np.array([
@@ -19,138 +19,141 @@ cart_coord = np.array([
     [[6.5, 0.], [6., 0.8660254], [6.5, 1.73205081], [6., 2.59807621], [6.5, 3.46410162]],
     [[7.5, 0.], [7., 0.8660254], [7.5, 1.73205081], [7., 2.59807621], [7.5, 3.46410162]]
 ])
-x_coord = 1
-y_coord = 1
-bmu = cart_coord[x_coord, y_coord]
-radius = 2.
-learning_rate = 0.5
+COLUMN = 1
+ROW = 1
+RADIUS = 2.
+LEARNING_RATE = 0.5
+
+bmu = cart_coord[COLUMN, ROW]
 
 
 class BubbleTestCase(unittest.TestCase):
     def setUp(self):
         self.tested_function = bubble
-        self.g = self.tested_function(cart_coord, bmu, radius, learning_rate)
+        self.update_matrix = self.tested_function(cart_coord, bmu, RADIUS, LEARNING_RATE)
 
     def test_bmu_value(self):
-        error = abs(self.g[x_coord, y_coord] - learning_rate)
-        self.assertLessEqual(error, tolerance, 'wrong value in bmu position')
+        error = abs(self.update_matrix[COLUMN, ROW] - LEARNING_RATE)
+        self.assertLessEqual(error, TOLERANCE, 'wrong value in bmu position')
 
     def test_max_value(self):
-        error = abs(self.g[x_coord, y_coord] - self.g.max())
-        self.assertLessEqual(error, tolerance, 'bmu has not the greatest value in g matrix')
+        error = abs(self.update_matrix[COLUMN, ROW] - self.update_matrix.max())
+        self.assertLessEqual(error, TOLERANCE, 'bmu has not the greatest value in g matrix')
 
     def test_neighbourhood_values(self):
         for i in range(cart_coord.shape[0]):
             for j in range(cart_coord.shape[1]):
-                neighbourhood_membership = radius - euclidean(cart_coord[i, j], bmu)
+                neighbourhood_membership = RADIUS - euclidean(cart_coord[i, j], bmu)
                 if neighbourhood_membership > 0:
-                    error = abs(self.g[i, j] - learning_rate)
-                    self.assertLessEqual(error, tolerance, 'g matrix has an incorrect values')
+                    error = abs(self.update_matrix[i, j] - LEARNING_RATE)
+                    self.assertLessEqual(error, TOLERANCE, 'g matrix has an incorrect values')
                 else:
-                    error = abs(self.g[i, j])
-                    self.assertLessEqual(error, tolerance, 'g matrix has an incorrect values')
+                    error = abs(self.update_matrix[i, j])
+                    self.assertLessEqual(error, TOLERANCE, 'g matrix has an incorrect values')
 
 
 class ConicalTestCase(unittest.TestCase):
     def setUp(self):
         self.tested_function = conical
-        self.g = self.tested_function(cart_coord, bmu, radius, learning_rate)
+        self.update_matrix = self.tested_function(cart_coord, bmu, RADIUS, LEARNING_RATE)
 
     def test_bmu_value(self):
-        error = abs(self.g[x_coord, y_coord] - learning_rate)
-        self.assertLessEqual(error, tolerance, 'wrong value in bmu position')
+        error = abs(self.update_matrix[COLUMN, ROW] - LEARNING_RATE)
+        self.assertLessEqual(error, TOLERANCE, 'wrong value in bmu position')
 
     def test_max_value(self):
-        error = abs(self.g[x_coord, y_coord] - self.g.max())
-        self.assertLessEqual(error, tolerance, 'bmu has not the greatest value in g matrix')
+        error = abs(self.update_matrix[COLUMN, ROW] - self.update_matrix.max())
+        self.assertLessEqual(error, TOLERANCE, 'bmu has not the greatest value in g matrix')
 
     def test_neighbourhood_values(self):
         for i in range(cart_coord.shape[0]):
             for j in range(cart_coord.shape[1]):
-                neighbourhood_membership = radius - euclidean(cart_coord[i, j], bmu)
+                neighbourhood_membership = RADIUS - euclidean(cart_coord[i, j], bmu)
                 if neighbourhood_membership > 0:
-                    self.assertGreater(self.g[i, j], 0, 'g matrix has an incorrect values')
+                    self.assertGreater(self.update_matrix[i, j], 0,
+                                       'g matrix has an incorrect values')
                 else:
-                    error = abs(self.g[i, j])
-                    self.assertLessEqual(error, tolerance, 'g matrix map has an incorrect values')
+                    error = abs(self.update_matrix[i, j])
+                    self.assertLessEqual(error, TOLERANCE, 'g matrix map has an incorrect values')
 
 
 class GaussianTestCase(unittest.TestCase):
     def setUp(self):
         self.tested_function = gaussian
-        self.g = self.tested_function(cart_coord, bmu, radius, learning_rate)
+        self.update_matrix = self.tested_function(cart_coord, bmu, RADIUS, LEARNING_RATE)
 
     def test_bmu_value(self):
-        error = abs(self.g[x_coord, y_coord] - learning_rate)
-        self.assertLessEqual(error, tolerance, 'wrong value in bmu position')
+        error = abs(self.update_matrix[COLUMN, ROW] - LEARNING_RATE)
+        self.assertLessEqual(error, TOLERANCE, 'wrong value in bmu position')
 
     def test_max_value(self):
-        error = abs(self.g[x_coord, y_coord] - self.g.max())
-        self.assertLessEqual(error, tolerance, 'bmu has not the greatest value in g matrix')
+        error = abs(self.update_matrix[COLUMN, ROW] - self.update_matrix.max())
+        self.assertLessEqual(error, TOLERANCE, 'bmu has not the greatest value in g matrix')
 
     def test_neighbourhood_values(self):
         for i in range(cart_coord.shape[0]):
             for j in range(cart_coord.shape[1]):
-                self.assertGreater(self.g[i, j], 0, 'g matrix has an incorrect values')
+                self.assertGreater(self.update_matrix[i, j], 0, 'g matrix has an incorrect values')
 
 
 class GaussianCutTestCase(unittest.TestCase):
     def setUp(self):
         self.tested_function = gaussian_cut
-        self.g = self.tested_function(cart_coord, bmu, radius, learning_rate)
+        self.update_matrix = self.tested_function(cart_coord, bmu, RADIUS, LEARNING_RATE)
 
     def test_bmu_value(self):
-        error = abs(self.g[x_coord, y_coord] - learning_rate)
-        self.assertLessEqual(error, tolerance, 'wrong value in bmu position')
+        error = abs(self.update_matrix[COLUMN, ROW] - LEARNING_RATE)
+        self.assertLessEqual(error, TOLERANCE, 'wrong value in bmu position')
 
     def test_max_value(self):
-        error = abs(self.g[x_coord, y_coord] - self.g.max())
-        self.assertLessEqual(error, tolerance, 'bmu has not the greatest value in g matrix')
+        error = abs(self.update_matrix[COLUMN, ROW] - self.update_matrix.max())
+        self.assertLessEqual(error, TOLERANCE, 'bmu has not the greatest value in g matrix')
 
     def test_neighbourhood_values(self):
         for i in range(cart_coord.shape[0]):
             for j in range(cart_coord.shape[1]):
-                neighbourhood_membership = radius - euclidean(cart_coord[i, j], bmu)
+                neighbourhood_membership = RADIUS - euclidean(cart_coord[i, j], bmu)
                 if neighbourhood_membership > 0:
-                    self.assertGreater(self.g[i, j], 0, 'g matrix has an incorrect values')
+                    self.assertGreater(self.update_matrix[i, j], 0,
+                                       'g matrix has an incorrect values')
                 else:
-                    error = abs(self.g[i, j])
-                    self.assertLessEqual(error, tolerance, 'g matrix map has an incorrect values')
+                    error = abs(self.update_matrix[i, j])
+                    self.assertLessEqual(error, TOLERANCE, 'g matrix map has an incorrect values')
 
 
 class MexicanHatTestCase(unittest.TestCase):
     def setUp(self):
         self.tested_function = mexican_hat
-        self.g = self.tested_function(cart_coord, bmu, radius, learning_rate)
+        self.update_matrix = self.tested_function(cart_coord, bmu, RADIUS, LEARNING_RATE)
 
     def test_bmu_value(self):
-        error = abs(self.g[x_coord, y_coord] - learning_rate)
-        self.assertLessEqual(error, tolerance, 'wrong value in bmu position')
+        error = abs(self.update_matrix[COLUMN, ROW] - LEARNING_RATE)
+        self.assertLessEqual(error, TOLERANCE, 'wrong value in bmu position')
 
     def test_max_value(self):
-        error = abs(self.g[x_coord, y_coord] - self.g.max())
-        self.assertLessEqual(error, tolerance, 'bmu has not the greatest value in g matrix')
+        error = abs(self.update_matrix[COLUMN, ROW] - self.update_matrix.max())
+        self.assertLessEqual(error, TOLERANCE, 'bmu has not the greatest value in g matrix')
 
     def test_min_values(self):
-        self.assertLess(self.g.min(), 0, 'min value is greater or equal than zero')
+        self.assertLess(self.update_matrix.min(), 0, 'min value is greater or equal than zero')
 
 
 class NoNeighbourhoodTestCase(unittest.TestCase):
     def setUp(self):
         self.tested_function = no_neighbourhood
-        self.g = self.tested_function(cart_coord, bmu, radius, learning_rate)
+        self.update_matrix = self.tested_function(cart_coord, bmu, RADIUS, LEARNING_RATE)
 
     def test_bmu_value(self):
-        error = abs(self.g[x_coord, y_coord] - learning_rate)
-        self.assertLessEqual(error, tolerance, 'wrong value in bmu position')
+        error = abs(self.update_matrix[COLUMN, ROW] - LEARNING_RATE)
+        self.assertLessEqual(error, TOLERANCE, 'wrong value in bmu position')
 
     def test_max_value(self):
-        error = abs(self.g[x_coord, y_coord] - self.g.max())
-        self.assertLessEqual(error, tolerance, 'bmu has not the greatest value in g matrix')
+        error = abs(self.update_matrix[COLUMN, ROW] - self.update_matrix.max())
+        self.assertLessEqual(error, TOLERANCE, 'bmu has not the greatest value in g matrix')
 
     def test_min_values(self):
-        g_c = self.g.copy()
-        g_c[x_coord, y_coord] = 0.
+        g_c = self.update_matrix.copy()
+        g_c[COLUMN, ROW] = 0.
         self.assertEqual(g_c.min(), 0, 'min value is not zero')
         self.assertEqual(g_c.max(), 0, 'max value is not zero (excluding bmu)')
 

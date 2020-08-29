@@ -13,8 +13,8 @@ def exponential(init, final, total_steps, step):
 
 @jit(float64(float64, float64, float64, float64), nopython=True, fastmath=True)
 def rational(init, final, total_steps, step):
-    b = (total_steps - 1) / ((init / final) - 1)
-    return init * b / (b + step)
+    value = (total_steps - 1) / ((init / final) - 1)
+    return init * value / (value + step)
 
 
 @jit(float64(float64, float64, float64, float64), nopython=True, fastmath=True)

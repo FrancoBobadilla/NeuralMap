@@ -1,9 +1,9 @@
 import unittest
-from ..neural_map import NeuralMap
 from numpy import array, empty
 from numba import jit, float64
+from ..neural_map import NeuralMap
 
-tolerance = 1e-8
+TOLERANCE = 1e-8
 
 numeric_weights = array([
     [[1.1, 0.], [-10.1, -10.1]],
@@ -92,20 +92,20 @@ wrong_cases = [
 ]
 
 
-def euclidean(a, b):
-    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
+def euclidean(f_element, s_element):
+    return ((f_element[0] - s_element[0]) ** 2 + (f_element[1] - s_element[1]) ** 2) ** 0.5
 
 
 @jit(float64[:, :](float64[:, :], float64[:, :]), nopython=True, fastmath=True)
-def continuous_jaccard(x, w):
-    res = empty((x.shape[0], w.shape[0]), dtype=x.dtype)
-    for i in range(x.shape[0]):
-        for j in range(w.shape[0]):
+def continuous_jaccard(f_set, s_set):
+    res = empty((f_set.shape[0], s_set.shape[0]), dtype=f_set.dtype)
+    for i in range(f_set.shape[0]):
+        for j in range(s_set.shape[0]):
             num = 0.0
             denum = 0.0
-            for k in range(x.shape[1]):
-                num += x[i, k] * w[j, k]
-                denum += x[i, k] ** 2 + w[j, k] ** 2
+            for k in range(f_set.shape[1]):
+                num += f_set[i, k] * s_set[j, k]
+                denum += f_set[i, k] ** 2 + s_set[j, k] ** 2
 
             denum -= num
 
@@ -124,44 +124,53 @@ class MetricDistanceTestCase(unittest.TestCase):
         for case in cases:
             exception_raised = False
             try:
-                som = NeuralMap(z=case['weights'].shape[2], x=case['weights'].shape[0], y=case['weights'].shape[1],
+                som = NeuralMap(variables=case['weights'].shape[2],
+                                columns=case['weights'].shape[0],
+                                rows=case['weights'].shape[1],
                                 weights=case['weights'],
                                 metric=case['metric'],
                                 **case['kwargs'])
-            except:
+
+                errors = abs(
+                    som.generate_activation_map(case['reference']) - case['expected']).flatten()
+
+                for error in errors:
+                    self.assertLessEqual(error, TOLERANCE,
+                                         'wrong activation value in ' + str(case['metric']))
+
+            except (ValueError, Exception):
                 exception_raised = True
 
             self.assertFalse(exception_raised,
-                             'exception raised while entering distance metric ' + str(case['metric']))
-
-            if not exception_raised:
-                errors = abs(som.generate_activation_map(case['reference']) - case['expected']).flatten()
-                for error in errors:
-                    self.assertLessEqual(error, tolerance, 'wrong activation value in ' + str(case['metric']))
+                             'exception raised while entering distance metric ' + str(
+                                 case['metric']))
 
     def test_wrong_string_entered(self):
         for case in wrong_cases:
             exception_raised = False
             try:
-                som = NeuralMap(z=case['weights'].shape[2], x=case['weights'].shape[0], y=case['weights'].shape[1],
-                                weights=case['weights'],
-                                metric=case['metric'],
-                                **case['kwargs'])
-            except:
+                NeuralMap(variables=case['weights'].shape[2],
+                          columns=case['weights'].shape[0],
+                          rows=case['weights'].shape[1],
+                          weights=case['weights'],
+                          metric=case['metric'],
+                          **case['kwargs'])
+            except (ValueError, Exception):
                 exception_raised = True
 
             self.assertTrue(exception_raised,
-                            'exception not raised while entering string distance metric ' + str(case['metric']))
+                            'exception not raised while entering string distance metric ' +
+                            str(case['metric']))
 
     def test_function_entered_metric(self):
         exception_raised = False
         try:
-            NeuralMap(z=cases[0]['weights'].shape[2], x=cases[0]['weights'].shape[0],
-                            y=cases[0]['weights'].shape[1],
-                            weights=cases[0]['weights'],
-                            metric=continuous_jaccard,
-                            **cases[0]['kwargs'])
-        except:
+            NeuralMap(variables=cases[0]['weights'].shape[2], columns=cases[0]['weights'].shape[0],
+                      rows=cases[0]['weights'].shape[1],
+                      weights=cases[0]['weights'],
+                      metric=continuous_jaccard,
+                      **cases[0]['kwargs'])
+        except (ValueError, Exception):
             exception_raised = True
 
         self.assertFalse(exception_raised,
@@ -170,18 +179,18 @@ class MetricDistanceTestCase(unittest.TestCase):
 
 class PositionsTestCase(unittest.TestCase):
     def setUp(self):
-        self.som = NeuralMap(z=5, x=7, y=10, hexagonal=True)
+        self.som = NeuralMap(variables=5, metric='euclidean', columns=7, rows=10, hexagonal=True)
 
     def test_boundaries(self):
         positions = self.som.positions.reshape(-1, 2)
 
         left = 0.0
-        right = self.som.x
+        right = self.som.columns
         lower = 0.0
-        upper = self.som.y
+        upper = self.som.rows
 
         if self.som.hexagonal:
-            upper *= (3 ** 0.5) * 0.5  # relation between the apothem of an hexagon and its side length
+            upper *= (3 ** 0.5) * 0.5
 
         for position in positions:
             self.assertGreaterEqual(position[0], left, 'left boundary crossed')
@@ -195,7 +204,7 @@ class PositionsTestCase(unittest.TestCase):
             for comp_position in positions:
                 distance = euclidean(ref_position, comp_position)
                 if distance != 0:
-                    self.assertLessEqual(1.0, distance + tolerance,
+                    self.assertLessEqual(1.0, distance + TOLERANCE,
                                          'there are at least two nodes closer than they should')
 
     def test_index_position_consistency(self):
@@ -205,17 +214,23 @@ class PositionsTestCase(unittest.TestCase):
                 for comp_i in range(positions.shape[0]):
                     for comp_j in range(positions.shape[1]):
                         if ref_i == comp_i:
-                            self.assertEqual(positions[ref_i, ref_j, 0], positions[comp_i, comp_j, 0],
-                                             'index consistency not preserved')
+                            self.assertEqual(
+                                positions[ref_i, ref_j, 0],
+                                positions[comp_i, comp_j, 0],
+                                'index consistency not preserved'
+                            )
 
                         if ref_j == comp_j:
-                            self.assertEqual(positions[ref_i, ref_j, 1], positions[comp_i, comp_j, 1],
-                                             'index consistency not preserved')
+                            self.assertEqual(
+                                positions[ref_i, ref_j, 1],
+                                positions[comp_i, comp_j, 1],
+                                'index consistency not preserved'
+                            )
 
     def test_inner_adjacency(self):
         positions = self.som.positions.reshape(-1, 2)
 
-        expected_inner_nodes = (self.som.x - 2) * (self.som.y - 2)
+        expected_inner_nodes = (self.som.columns - 2) * (self.som.rows - 2)
         if expected_inner_nodes < 0:
             expected_inner_nodes = 0
 
@@ -227,7 +242,7 @@ class PositionsTestCase(unittest.TestCase):
 
             for comp_position in positions:
                 distance = euclidean(ref_position, comp_position)
-                if distance != 0 and distance <= 1.0 + tolerance:
+                if distance != 0 and distance <= 1.0 + TOLERANCE:
                     adjacency_count += 1
 
             if self.som.hexagonal and adjacency_count == 6:
@@ -236,7 +251,7 @@ class PositionsTestCase(unittest.TestCase):
             if not self.som.hexagonal and adjacency_count == 4:
                 actual_inner_nodes += 1
 
-        self.assertEqual(expected_inner_nodes, actual_inner_nodes, 'the net is not properly connected')
+        self.assertEqual(expected_inner_nodes, actual_inner_nodes, 'net is not properly connected')
 
 
 if __name__ == '__main__':

@@ -16,7 +16,7 @@ from hdbscan import HDBSCAN
 
 from sklearn_extra.cluster import KMedoids
 
-from . import _plot, _check_inputs, _decay_functions, _neighbourhood_functions
+from neural_map import _plot, _check_inputs, _decay_functions, _neighbourhood_functions
 
 
 def _identity(item):
@@ -188,7 +188,7 @@ class NeuralMap:
             radius_decay_function = _decay_functions.no_decay
 
         self._unified_distance_matrix_cache = None
-        self._hdbscan_cache = [None] * self.columns * self.rows
+        self._hdbscan_cache = [(None, None, None)] * self.columns * self.rows
 
         if learning_rate_decay_function == 'linear':
             learning_rate_decay_function = _decay_functions.linear
@@ -724,15 +724,15 @@ class NeuralMap:
 
         return {
             **{
-                'z': self.variables,
-                'x': self.columns,
-                'y': self.rows,
+                'variables': self.variables,
                 'metric': metric,
+                'columns': self.columns,
+                'rows': self.rows,
                 'hexagonal': self.hexagonal,
                 'toroidal': self.toroidal,
                 'seed': self.seed,
-                'weights': self.weights.tolist(),
-                'rp': self.relative_positions.tolist()
+                'weights': self.weights,
+                'relative_positions': self.relative_positions
             },
             **self._kwargs
         }

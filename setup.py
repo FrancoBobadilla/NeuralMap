@@ -1,28 +1,40 @@
-#!/usr/bin/env python
+import setuptools
 
-from distutils.core import setup
+with open("README.md", "r") as fh:
+    long_description = fh.read()
 
-setup(
-    name='neural_map',
-    packages=['neural_map'],
-    version='0.1',
-    license='MIT',
-    description='NeuralMap is a data analysis tool based on Self-Organizing Maps',
-    author='Franco José Bobadilla',
+setuptools.setup(
+    name='neural_map_franco_bobadilla',
+    version="0.0.1",
+    author="Franco José Bobadilla",
     author_email='1709673@ucc.edu.ar',
+    description='NeuralMap is a data analysis tool based on Self-Organizing Maps',
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url='https://github.com/FrancoBobadilla/NeuralMap',
-    download_url='https://github.com/FrancoBobadilla/NeuralMap',
-    keywords=['som', 'self-organizing maps', 'dimensionality reduction', 'machine learning', 'clustering', 'hdbscan'],
+    packages=setuptools.find_packages(),
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    python_requires='>=3.6',
+    license='MIT',
+    keywords=[
+        'som',
+        'self-organizing maps',
+        'dimensionality reduction',
+        'machine learning',
+        'clustering',
+        'hdbscan'
+    ],
     install_requires=[
-        'matplotlib',
-        'mpl_toolkits',
-        'collections',
-        'inspect',
-        'sklearn',
-        'numpy',
-        'scipy',
-        'numba',
-        'hdbscan',
-        'scikit-learn-extra'
+        'hdbscan~=0.8.26',
+        'scipy~=1.4.1',
+        'matplotlib~=3.2.1',
+        'scikit_learn_extra~=0.1.0b2',
+        'numpy~=1.18.3',
+        'numba~=0.50.1',
+        'scikit_learn~=0.23.2'
     ],
 )

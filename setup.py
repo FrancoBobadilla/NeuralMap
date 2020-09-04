@@ -4,8 +4,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='neural_map_franco_bobadilla',
-    version="0.0.1",
+    name='neural_map',
+    version="0.0.2",
     author="Franco José Bobadilla",
     author_email='1709673@ucc.edu.ar',
     description='NeuralMap is a data analysis tool based on Self-Organizing Maps',

@@ -620,15 +620,12 @@ class NeuralMap:
 
     def k_means(self, n_clusters=4):
 
-        # se checkea la cantidad de clusters ingresada
         _check_inputs.value_type(n_clusters, int)
         _check_inputs.positive(n_clusters)
 
-        # inicializa la instancia de KMeans
         clusters = KMeans(n_clusters=n_clusters, init="k-means++").fit(
             self.weights.reshape(self.columns * self.rows, self.variables))
 
-        # retorna los clusters y los centros
         return clusters.labels_.reshape(self.columns, self.rows), clusters.cluster_centers_
 
     def k_medoids(self, n_clusters=4):
@@ -658,7 +655,9 @@ class NeuralMap:
         _check_inputs.positive(min_cluster_size - 1)
         _check_inputs.value_type(plot_condensed_tree, bool)
 
-        if self._hdbscan_cache[min_cluster_size] is not None:
+        if self._hdbscan_cache[min_cluster_size][0] is not None \
+                and self._hdbscan_cache[min_cluster_size][1] is not None \
+                and self._hdbscan_cache[min_cluster_size][2] is not None:
             return self._hdbscan_cache[min_cluster_size]
 
         adjacency_matrix = self.get_unified_distance_matrix()[1]

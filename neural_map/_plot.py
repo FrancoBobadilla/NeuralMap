@@ -1,3 +1,16 @@
+"""
+Utility functions for making SOM-specific highly customizable plots
+
+Functions
+--------------
+.. autosummary::
+   :toctree: generated/
+   update
+   tiles
+   bubbles
+   legend_or_bar
+
+"""
 from numpy import ones, nanmax, nanmin, arange, pi, ndarray, isnan, unravel_index, sqrt
 
 from matplotlib import colorbar, colors, pyplot as plt
@@ -5,8 +18,41 @@ from matplotlib.patches import Polygon, RegularPolygon, Circle, Wedge, Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-def update(positions, hexagonal, data, dimensions, bmu_position, relative_positions, displacement,
+def update(positions, hexagonal, data, dimensions, bmu, relative_positions, displacement,
            color_map=plt.cm.get_cmap('RdYlGn_r')):
+    """
+    Plot the update value of each node and their relative position displacement.
+
+    Parameters
+    ----------
+    positions: ndarray
+        Cartesian coordinates of the nodes in the 2D virtual space.
+        Dimensions should be (x, y, 2)
+    hexagonal: bool
+        Whether the nodes have an hexagonal shape or squared
+    data: array_like
+        Update value of each node.
+        Dimensions should be (x, y)
+    dimensions: array_like
+        Horizontal and vertical measure of the map in the virtual space
+        Dimensions should be (2)
+    bmu: tuple or array_like
+        Cartesian coordinate of the best matching unit in the 2D virtual space.
+        Dimensions should be (2)
+    relative_positions: ndarray
+        Cartesian coordinates of the relative positions of the nodes.
+        Dimensions should be (x, y, 2)
+    displacement: array_like
+        Displacement vector of each node over the relative positions space
+        Dimensions should be (x, y, 2)
+    color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
+        Color map to paint the nodes
+
+    Returns
+    -------
+    None
+
+    """
     data_c = data.copy()
     data_max = nanmax(data_c)
     data_min = nanmin(data_c)
@@ -50,9 +96,9 @@ def update(positions, hexagonal, data, dimensions, bmu_position, relative_positi
                                facecolor=color_map(data_c[i, j]),
                                edgecolor=color_map(data_c[i, j])))
 
-    axes.add_patch(Circle(bmu_position, radius=radius / 3, facecolor='white', edgecolor='white'))
+    axes.add_patch(Circle(bmu, radius=radius / 3, facecolor='white', edgecolor='white'))
     axes.add_patch(
-        Circle((bmu_position + dimensions / 2) % dimensions, radius=radius / 3, facecolor='black',
+        Circle((bmu + dimensions / 2) % dimensions, radius=radius / 3, facecolor='black',
                edgecolor='black'))
     axes.quiver(relative_positions[..., 0], relative_positions[..., 1], displacement[..., 0],
                 displacement[..., 1],
@@ -64,8 +110,45 @@ def update(positions, hexagonal, data, dimensions, bmu_position, relative_positi
 
 
 def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, borders=False,
-          norm=True,
-          labels=None, intensity=None, title=None):
+          norm=True, labels=None, intensity=None, title=None):
+    """
+    Plot the map with nodes having colors according to their values (or set of values).
+    Nodes have an hexagonal or squared shape that completely fill the space.
+
+    Parameters
+    ----------
+    positions: ndarray
+        Cartesian coordinates of the nodes in the 2D virtual space.
+        Dimensions should be (x, y, 2)
+    hexagonal: bool
+        Whether the nodes have an hexagonal shape or squared
+    data: array_like
+        Value of each node.
+        Dimensions should be (x, y)
+    color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
+        Color map to paint the nodes.
+        Ignored if entered a ``labels`` value
+    size: int (optional, default 10)
+        Horizontal and vertical size of the final plot
+    borders: bool (optional, default False)
+        Whether the nodes borders should be drawn or not
+    norm: bool (optional, default True)
+        Whether it's necessary to normalize the input data to the range [0, 1] or not
+    labels: array_like (optional, default None)
+        A 1D array containing each node label (could be their class or cluster) as a numeric value
+        Length should be (x * y)
+    intensity: array_like (optional, default None)
+        Alpha value of each node. This value affects nodes colors. A low value makes them lighter.
+        Dimensions should be (x, y)
+        Values should be in the range [0, 1]
+    title: string (optional, default None)
+        Plot title
+
+    Returns
+    -------
+    None
+
+    """
     if intensity is None:
         intensity = ones((positions.shape[0], positions.shape[1]))
 
@@ -243,17 +326,64 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                   data_min, data_max, color_map, figure, axes, labels=labels)
 
 
-def bubbles(diameters, positions, data, connections=None, reverse=None, norm=True, labels=None,
-            intensity=None,
-            title=None, color_map=None, size=10, borders=False, display_empty_nodes=True):
+def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10,
+            borders=False, norm=True, labels=None, intensity=None, title=None, connections=None,
+            reverse=None, display_empty_nodes=True):
+    """
+    Plot the map with nodes having colors according to their values (or set of values).
+    Nodes have an hexagonal or squared shape that completely fill the space.
+
+    Parameters
+    ----------
+    diameters: array_like
+        Diameters of each node.
+        Dimensions should be (x, y)
+        Values should be greater than 0
+    positions: ndarray
+        Cartesian coordinates of the nodes in the 2D virtual space.
+        Dimensions should be (x, y, 2)
+    data: array_like
+        Value of each node.
+        Dimensions should be (x, y)
+    color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
+        Color map to paint the nodes.
+        Ignored if entered a ``labels`` value
+    size: int (optional, default 10)
+        Horizontal and vertical size of the final plot
+    borders: bool (optional, default False)
+        Whether the nodes borders should be drawn or not
+    norm: bool (optional, default True)
+        Whether it's necessary to normalize the input data to the range [0, 1] or not
+    labels: array_like (optional, default None)
+        A 1D array containing each node label (could be their class or cluster) as a numeric value
+        Length should be (x * y)
+    intensity: array_like (optional, default None)
+        Alpha value of each node. This value affects nodes colors. A low value makes them lighter.
+        Dimensions should be (x, y)
+        Values should be in the range [0, 1]
+    title: string (optional, default None)
+        Plot title
+    connections: ndarray (optional, default None)
+        Matrix indicating intensity of connections between nodes.
+        Use nan to represent that there is no connection between two nodes.
+        Dimensions should be (x * y, x * y)
+    reverse: array_like (optional, default None)
+        Matrix of bool values indicating for each connection whether it should be drawn straight
+        or be drawn "going around" the toroidal space
+        Dimensions should be (x * y, x * y)
+    display_empty_nodes: bool (optional, default True)
+        Whether nodes with a ``diameter`` value equals to 0 should be drawn or not
+
+    Returns
+    -------
+    None
+
+    """
     if intensity is None:
         intensity = ones((positions.shape[0], positions.shape[1]))
 
-    if color_map is None:
-        if labels is None:
-            color_map = plt.cm.get_cmap('RdYlGn_r')
-        else:
-            color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
+    if labels is not None:
+        color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
 
     d_max = diameters.max()
 
@@ -357,6 +487,37 @@ def bubbles(diameters, positions, data, connections=None, reverse=None, norm=Tru
 
 def legend_or_bar(position_max, position_min, data_min, data_max, color_map, figure, axes,
                   labels=None):
+    """
+    Plot the right color bar or legend if labels are provided
+
+    Parameters
+    ----------
+    position_max: list
+        Cartesian coordinates of the upper right corner.
+        Should be a list with two elements.
+    position_min: list
+        Cartesian coordinates of the bottom left corner.
+        Should be a list with two elements.
+    data_min: float
+        Minimum value of the nodes.
+        Ignored if labels are provided.
+    data_max: float
+        Maximum value of the nodes.
+        Ignored if labels are provided.
+    color_map: colormap
+        Color map to paint the nodes.
+    figure: figure
+        Matplotlib figure
+    axes: axes
+        Matplotlib axes
+    labels: array_like (optional, default None)
+        A 1D array containing labels without repeating, as a numeric value.
+
+    Returns
+    -------
+    None
+
+    """
     plt.plot(position_max[0], position_max[1], ' ', alpha=0)
     plt.plot(position_min[0], position_min[1], ' ', alpha=0)
     ax_cb = make_axes_locatable(axes).new_horizontal(size="5%", pad=0.25)

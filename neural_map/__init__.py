@@ -1,4 +1,7 @@
-from neural_map._neural_map import *
-from neural_map._plot import *
-from neural_map._decay_functions import *
-from neural_map._neighbourhood_functions import *
+"""
+A package for analysing data based on Self Organizing Maps
+"""
+from ._neural_map import *
+from ._plot import *
+from ._decay_functions import *
+from ._neighbourhood_functions import *

@@ -786,11 +786,10 @@ class NeuralMap:
         _check_inputs.value_type(size, int)
         _check_inputs.positive(size)
 
-        _plot.bubbles(activation_frequency, self.relative_positions, quantization_error,
+        _plot.bubbles(activation_frequency, self.relative_positions, quantization_error, size=size,
+                      borders=borders, title='RP-HDSCAN   quantization error',
                       connections=connections, reverse=reverse,
-                      title='RP-HDSCAN   quantization error', borders=borders,
-                      display_empty_nodes=display_empty_nodes,
-                      size=size)
+                      display_empty_nodes=display_empty_nodes)
 
     def plot_labels(self, data, labels=None, labels_to_display=None, cluster=True,
                     min_cluster_size=3, borders=True, display_empty_nodes=True, size=10):
@@ -815,13 +814,10 @@ class NeuralMap:
 
         if labels_to_display is None:
             _plot.bubbles(activation_frequency, self.relative_positions, map_labels,
-                          connections=connections,
-                          norm=False,
-                          labels=unique_labels, title='RP-HDBSCAN   labels',
-                          color_map=plt.cm.get_cmap('hsv', len(unique_labels) + 1),
-                          reverse=reverse, borders=borders,
-                          display_empty_nodes=display_empty_nodes,
-                          size=size)
+                          color_map=plt.cm.get_cmap('hsv', len(unique_labels) + 1), size=size,
+                          borders=borders, norm=False, labels=unique_labels,
+                          title='RP-HDBSCAN   labels', connections=connections, reverse=reverse,
+                          display_empty_nodes=display_empty_nodes)
 
         else:
             labels_to_display_indices = where(isin(unique_labels, labels_to_display))[0]
@@ -832,13 +828,12 @@ class NeuralMap:
                           map_labels[..., labels_to_display_indices].reshape(
                               [activation_frequency.shape[0], activation_frequency.shape[1],
                                len(labels_to_display_indices)]),
-                          connections=connections,
-                          norm=False, labels=unique_labels[labels_to_display_indices],
-                          title='RP-HDBSCAN   labels',
                           color_map=plt.cm.get_cmap('hsv', len(
-                              unique_labels[labels_to_display_indices]) + 1),
-                          reverse=reverse,
-                          borders=borders, display_empty_nodes=display_empty_nodes, size=size)
+                              unique_labels[labels_to_display_indices]) + 1), size=size,
+                          borders=borders, norm=False,
+                          labels=unique_labels[labels_to_display_indices],
+                          title='RP-HDBSCAN   labels', connections=connections, reverse=reverse,
+                          display_empty_nodes=display_empty_nodes)
 
     def plot_map_value(self, data, attached_values, func=mean, cluster=True, min_cluster_size=3,
                        borders=True, display_empty_nodes=True, size=10):
@@ -851,11 +846,10 @@ class NeuralMap:
         _check_inputs.value_type(size, int)
         _check_inputs.positive(size)
         nodes_values = self.map_attachments(data, attached_values, func)
-        _plot.bubbles(activation_frequency, self.relative_positions, nodes_values,
-                      connections=connections,
-                      norm=True,
-                      title='RP-HDBSCAN   attached values', reverse=reverse, borders=borders,
-                      display_empty_nodes=display_empty_nodes, size=size)
+        _plot.bubbles(activation_frequency, self.relative_positions, nodes_values, size=size,
+                      borders=borders, norm=True, title='RP-HDBSCAN   attached values',
+                      connections=connections, reverse=reverse,
+                      display_empty_nodes=display_empty_nodes)
 
     def plot_unified_distance_matrix(self, detailed=True, borders=True, size=10):
 

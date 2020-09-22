@@ -1,6 +1,6 @@
 """
 Utility functions for checking some conditions over data
-and raise an Error when some expected condition is not satisfied
+and raise an Error when some expected condition is not satisfied.
 
 Functions
 --------------
@@ -24,9 +24,9 @@ def length(first_array, second_array):
     Parameters
     ----------
     first_array: array_like
-        First array to compare
+        First array to compare.
     second_array: array_like
-        Second array to compare
+        Second array to compare.
 
     Raises
     ------
@@ -36,7 +36,7 @@ def length(first_array, second_array):
     Returns
     -------
     success: bool
-        Return true
+        Return True.
 
     """
     if len(first_array) != len(second_array):
@@ -54,21 +54,21 @@ def ndarray_and_shape(data, expected_shape):
     Parameters
     ----------
     data: array_like
-        Data to check, should be a ndarray
+        Data to check, should be a ndarray.
     expected_shape: tuple
-        Expected shape of ``data``
+        Expected shape of ``data``.
 
     Raises
     ------
     ValueError
-        Raised when data is not a ndarray,
+        Raised when ``data`` is not a ndarray,
         or doesn't have the expected shape,
-        or contains a nan or inf value
+        or contains a nan or inf value.
 
     Returns
     -------
     success: bool
-        Return true
+        Return True.
 
     """
     if not isinstance(data, ndarray):
@@ -98,25 +98,25 @@ def ndarray_and_shape(data, expected_shape):
 
 def value_type(value, types):
     """
-    Check that the ``value`` type is one of ``types``
+    Check that the ``value`` type is one of ``types``.
 
     Parameters
     ----------
     value: Any
-        Variable to check its type
+        Variable to check its type.
     types: type or tuple or array
-        Acceptable types
-        Could be one type, or a tuple or array of types
+        Acceptable types.
+        Could be one type, or a tuple or array of types.
 
     Raises
     ------
     ValueError
-        Raised when ``value`` is not any of the specified ``types``
+        Raised when ``value`` is not any of the specified ``types``.
 
     Returns
     -------
     success: bool
-        Return true
+        Return True.
 
     """
     if not isinstance(value, types):
@@ -130,22 +130,22 @@ def value_type(value, types):
 
 def positive(value):
     """
-    Check that the ``value`` is greater than zero
+    Check that the ``value`` is greater than 0.
 
     Parameters
     ----------
     value: number
-        Value to check
+        Value to check.
 
     Raises
     ------
     ValueError
-        Raised when ``value`` is not greater than zero
+        Raised when ``value`` is not greater than zero.
 
     Returns
     -------
     success: bool
-        Return true
+        Return True.
 
     """
     if not value > 0:
@@ -159,22 +159,22 @@ def positive(value):
 
 def function(func):
     """
-    Check that ``func`` is callable
+    Check that ``func`` is callable.
 
     Parameters
     ----------
     func: callable
-        Value to check
+        Value to check.
 
     Raises
     ------
     ValueError
-        Raised when ``func`` is not callable
+        Raised when ``func`` is not callable.
 
     Returns
     -------
     success: bool
-        Return true
+        Return True.
 
     """
     if not callable(func):
@@ -190,15 +190,15 @@ def numpy_matrix(data, expected_len):
     Check that ``data`` is a ndarray,
     has two dimensions,
     its first dimension is greater than 0,
-    its second dimension has the `expected_len`,
-    and it doesn't contain any nan or inf value
+    its second dimension has the ``expected_len``,
+    and it doesn't contain any nan or inf value.
 
     Parameters
     ----------
     data: ndarray
-        2D ndarray to check
+        2D ndarray to check.
     expected_len: int
-        Expected value of the data second dimension
+        Expected length of the data at second dimension
 
     Raises
     ------
@@ -207,12 +207,12 @@ def numpy_matrix(data, expected_len):
         or has an amount of dimensions different than 2,
         or its first dimension is equal to 0,
         or its second dimension is different than ``expected_len``
-        or contains any nan or inf value
+        or contains any nan or inf value.
 
     Returns
     -------
     success: bool
-        Return true
+        Return True.
 
     """
     if not isinstance(data, ndarray):

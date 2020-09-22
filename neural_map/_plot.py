@@ -1,5 +1,5 @@
 """
-Utility functions for making SOM-specific highly customizable plots
+Utility functions for making SOM-specific highly customizable plots.
 
 Functions
 --------------
@@ -27,30 +27,26 @@ def update(positions, hexagonal, data, dimensions, bmu, relative_positions, disp
     ----------
     positions: ndarray
         Cartesian coordinates of the nodes in the 2D virtual space.
-        Dimensions should be (x, y, 2)
+        Dimensions should be (x, y, 2).
     hexagonal: bool
-        Whether the nodes have an hexagonal shape or squared
+        Whether the nodes have an hexagonal shape or squared.
     data: array_like
         Update value of each node.
-        Dimensions should be (x, y)
+        Dimensions should be (x, y).
     dimensions: array_like
-        Horizontal and vertical measure of the map in the virtual space
-        Dimensions should be (2)
+        Horizontal and vertical measure of the map in the virtual space.
+        Dimensions should be (2).
     bmu: tuple or array_like
         Cartesian coordinate of the best matching unit in the 2D virtual space.
-        Dimensions should be (2)
+        Dimensions should be (2).
     relative_positions: ndarray
         Cartesian coordinates of the relative positions of the nodes.
-        Dimensions should be (x, y, 2)
+        Dimensions should be (x, y, 2).
     displacement: array_like
-        Displacement vector of each node over the relative positions space
-        Dimensions should be (x, y, 2)
+        Displacement vector of each node over the relative positions space.
+        Dimensions should be (x, y, 2).
     color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
-        Color map to paint the nodes
-
-    Returns
-    -------
-    None
+        Color map to paint the nodes.
 
     """
     data_c = data.copy()
@@ -63,10 +59,8 @@ def update(positions, hexagonal, data, dimensions, bmu, relative_positions, disp
 
     data_c -= data_min
     data_c /= data_max - data_min
-
     x_range = arange(positions.shape[0])
     y_range = arange(positions.shape[1])
-
     figure = plt.figure(figsize=(5, 5))
     axes = figure.add_subplot(111)
     axes.set_aspect('equal')
@@ -103,7 +97,6 @@ def update(positions, hexagonal, data, dimensions, bmu, relative_positions, disp
     axes.quiver(relative_positions[..., 0], relative_positions[..., 1], displacement[..., 0],
                 displacement[..., 1],
                 angles='xy', scale_units='xy', scale=1, zorder=10)
-
     legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
                   [positions[..., 0].min(), positions[..., 1].min()],
                   data_min, data_max, color_map, figure, axes)
@@ -119,34 +112,30 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
     ----------
     positions: ndarray
         Cartesian coordinates of the nodes in the 2D virtual space.
-        Dimensions should be (x, y, 2)
+        Dimensions should be (x, y, 2).
     hexagonal: bool
-        Whether the nodes have an hexagonal shape or squared
+        Whether the nodes have an hexagonal shape or squared.
     data: array_like
         Value of each node.
-        Dimensions should be (x, y)
+        Dimensions should be (x, y).
     color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
         Color map to paint the nodes.
-        Ignored if entered a ``labels`` value
+        Ignored if entered a ``labels`` value.
     size: int (optional, default 10)
-        Horizontal and vertical size of the final plot
+        Horizontal and vertical size of the final plot.
     borders: bool (optional, default False)
-        Whether the nodes borders should be drawn or not
+        Draw nodes borders.
     norm: bool (optional, default True)
-        Whether it's necessary to normalize the input data to the range [0, 1] or not
+        Normalize input ``data`` to the range [0, 1].
     labels: array_like (optional, default None)
-        A 1D array containing each node label (could be their class or cluster) as a numeric value
-        Length should be (x * y)
+        A 1D array containing each node label (could be their class or cluster) as an integer value.
+        Length should be (x * y).
     intensity: array_like (optional, default None)
-        Alpha value of each node. This value affects nodes colors. A low value makes them lighter.
-        Dimensions should be (x, y)
-        Values should be in the range [0, 1]
+        Alpha value of each node. This value affects nodes colors. A lower value makes them lighter.
+        Dimensions should be (x, y).
+        Values should be in the range [0, 1].
     title: string (optional, default None)
-        Plot title
-
-    Returns
-    -------
-    None
+        Plot some title.
 
     """
     if intensity is None:
@@ -170,7 +159,6 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
 
     x_range = arange(positions.shape[0])
     y_range = arange(positions.shape[1])
-
     figure = plt.figure(figsize=(size, size))
     axes = figure.add_subplot(111)
     axes.set_aspect('equal')
@@ -193,7 +181,6 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
         axes.set_yticks(y_range)
 
     half_radius = radius / 2
-
     axes.set_xticklabels(x_range)
     axes.set_yticklabels(y_range)
 
@@ -202,6 +189,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
             if isinstance(data_c[i, j], ndarray):
                 x_position = positions[(i, j, 0)]
                 y_position = positions[(i, j, 1)]
+
                 if hexagonal:
                     if not isnan(data_c[i, j, 0]):
                         axes.add_patch(Polygon(
@@ -212,6 +200,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                             facecolor=color_map(data_c[i, j, 0]),
                             edgecolor=color_map(data_c[i, j, 0]),
                             alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 1]):
                         axes.add_patch(
                             Polygon(([(x_position + .25, y_position + half_radius / 2),
@@ -221,6 +210,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                     facecolor=color_map(data_c[i, j, 1]),
                                     edgecolor=color_map(data_c[i, j, 1]),
                                     alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 2]):
                         axes.add_patch(
                             Polygon(([(x_position, y_position + half_radius),
@@ -230,6 +220,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                     facecolor=color_map(data_c[i, j, 2]),
                                     edgecolor=color_map(data_c[i, j, 2]),
                                     alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 3]):
                         axes.add_patch(Polygon(
                             ([(x_position - .25, y_position + half_radius / 2),
@@ -239,6 +230,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                             facecolor=color_map(data_c[i, j, 3]),
                             edgecolor=color_map(data_c[i, j, 3]),
                             alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 4]):
                         axes.add_patch(
                             Polygon(([(x_position - .25, y_position - half_radius / 2),
@@ -248,6 +240,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                     facecolor=color_map(data_c[i, j, 4]),
                                     edgecolor=color_map(data_c[i, j, 4]),
                                     alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 5]):
                         axes.add_patch(
                             Polygon(([(x_position, y_position - half_radius),
@@ -257,6 +250,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                     facecolor=color_map(data_c[i, j, 5]),
                                     edgecolor=color_map(data_c[i, j, 5]),
                                     alpha=intensity[i, j]))
+
                 else:
                     if not isnan(data_c[i, j, 0]):
                         axes.add_patch(Polygon(
@@ -267,6 +261,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                             facecolor=color_map(data_c[i, j, 0]),
                             edgecolor=color_map(data_c[i, j, 0]),
                             alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 1]):
                         axes.add_patch(Polygon(
                             ([(x_position + .5, y_position + .5),
@@ -276,6 +271,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                             facecolor=color_map(data_c[i, j, 1]),
                             edgecolor=color_map(data_c[i, j, 1]),
                             alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 2]):
                         axes.add_patch(Polygon(
                             ([(x_position - .25, y_position + .25),
@@ -285,6 +281,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                             facecolor=color_map(data_c[i, j, 2]),
                             edgecolor=color_map(data_c[i, j, 2]),
                             alpha=intensity[i, j]))
+
                     if not isnan(data_c[i, j, 3]):
                         axes.add_patch(Polygon(
                             ([(x_position - .5, y_position - .5),
@@ -303,19 +300,21 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                        facecolor=color_map(data_c[i, j, num_vertices]),
                                        edgecolor=color_map(data_c[i, j, num_vertices]),
                                        alpha=intensity[i, j]))
+
                 if borders:
                     axes.add_patch(
                         RegularPolygon((x_position, y_position), numVertices=num_vertices,
-                                       radius=radius,
-                                       orientation=orientation,
+                                       radius=radius, orientation=orientation,
                                        fill=0, edgecolor='black', alpha=intensity[i, j]))
 
             else:
                 if not isnan(data_c[i, j]):
                     if borders:
                         edge_color = 'black'
+
                     else:
                         edge_color = color_map(data_c[i, j])
+
                     axes.add_patch(
                         RegularPolygon(positions[i, j], numVertices=num_vertices, radius=radius,
                                        orientation=orientation, facecolor=color_map(data_c[i, j]),
@@ -330,53 +329,49 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
             borders=False, norm=True, labels=None, intensity=None, title=None, connections=None,
             reverse=None, display_empty_nodes=True):
     """
-    Plot the map with nodes having colors according to their values (or set of values).
-    Nodes have an hexagonal or squared shape that completely fill the space.
+    Plot the map with nodes as circles with a position (center) and a diameter
+    with a color according to the input data.
 
     Parameters
     ----------
     diameters: array_like
         Diameters of each node.
-        Dimensions should be (x, y)
-        Values should be greater than 0
+        Dimensions should be (x, y).
+        Values should be greater than 0.
     positions: ndarray
         Cartesian coordinates of the nodes in the 2D virtual space.
-        Dimensions should be (x, y, 2)
+        Dimensions should be (x, y, 2).
     data: array_like
         Value of each node.
-        Dimensions should be (x, y)
+        Dimensions should be (x, y).
     color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
         Color map to paint the nodes.
-        Ignored if entered a ``labels`` value
+        Ignored if entered a ``labels`` value.
     size: int (optional, default 10)
-        Horizontal and vertical size of the final plot
+        Horizontal and vertical size of the final plot.
     borders: bool (optional, default False)
-        Whether the nodes borders should be drawn or not
+        Draw nodes borders.
     norm: bool (optional, default True)
-        Whether it's necessary to normalize the input data to the range [0, 1] or not
+        Normalize the input data to the range [0, 1].
     labels: array_like (optional, default None)
-        A 1D array containing each node label (could be their class or cluster) as a numeric value
-        Length should be (x * y)
+        A 1D array containing each node label (could be their class or cluster) as a numeric value.
+        Length should be (x * y).
     intensity: array_like (optional, default None)
         Alpha value of each node. This value affects nodes colors. A low value makes them lighter.
-        Dimensions should be (x, y)
-        Values should be in the range [0, 1]
+        Dimensions should be (x, y).
+        Values should be in the range [0, 1].
     title: string (optional, default None)
-        Plot title
+        Plot some title.
     connections: ndarray (optional, default None)
         Matrix indicating intensity of connections between nodes.
         Use nan to represent that there is no connection between two nodes.
-        Dimensions should be (x * y, x * y)
+        Dimensions should be (x * y, x * y).
     reverse: array_like (optional, default None)
         Matrix of bool values indicating for each connection whether it should be drawn straight
-        or be drawn "going around" the toroidal space
-        Dimensions should be (x * y, x * y)
+        or be drawn "going around" the toroidal space.
+        Dimensions should be (x * y, x * y).
     display_empty_nodes: bool (optional, default True)
-        Whether nodes with a ``diameter`` value equals to 0 should be drawn or not
-
-    Returns
-    -------
-    None
+        Draw nodes with a ``diameter`` value equals to 0 as grey diamonds.
 
     """
     if intensity is None:
@@ -386,7 +381,6 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
         color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
 
     d_max = diameters.max()
-
     data_c = data.copy()
     data_max = nanmax(data_c)
     data_min = nanmin(data_c)
@@ -410,9 +404,11 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
     if connections is not None:
         if reverse is None:
             reverse = connections.copy() * 0
+
         cm_min = nanmin(connections)
         width = positions[..., 0].max()
         height = positions[..., 1].max()
+
         for i in range(connections.shape[0]):
             for j in range(connections.shape[1]):
                 if not isnan(connections[i, j]):
@@ -420,34 +416,42 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
                         unravel_index(i, (positions.shape[0], positions.shape[1]))].copy()
                     second_pos = positions[
                         unravel_index(j, (positions.shape[0], positions.shape[1]))].copy()
+
                     if reverse[i, j]:
                         edges_connection = False
+
                         if first_pos[0] - second_pos[0] > width / 2:
                             edges_connection = True
                             second_pos[0] += 1 + width
+
                         if second_pos[0] - first_pos[0] > width / 2:
                             edges_connection = True
                             second_pos[0] -= 1 + width
+
                         if first_pos[1] - second_pos[1] > height / 2:
                             edges_connection = True
                             second_pos[1] += 1 + height
+
                         if second_pos[1] - first_pos[1] > height / 2:
                             edges_connection = True
                             second_pos[1] -= 1 + height
+
                         if edges_connection:
                             second_pos = (second_pos + first_pos) / 2
 
                     plt.plot([first_pos[0], second_pos[0]], [first_pos[1], second_pos[1]],
-                             zorder=-d_max * 2,
-                             color='black', alpha=(0.1 + cm_min / connections[i, j]) / 1.1)
+                             zorder=-d_max * 2, color='black',
+                             alpha=(0.1 + cm_min / connections[i, j]) / 1.1)
 
     for i in range(data_c.shape[0]):
         for j in range(data_c.shape[1]):
             if diameters[i, j] > 0:
                 if isinstance(data_c[i, j], ndarray):
                     start = 0
+
                     for k in range(data_c[i, j].shape[0]):
                         end = start + data_c[i, j, k] * 360 / diameters[i, j]
+
                         if data_c[i, j, k]:
                             axes.add_patch(
                                 Wedge(positions[i, j], r=sqrt(diameters[i, j] / d_max) / 3,
@@ -457,22 +461,27 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
                                       edgecolor=color_map(k / data_c[i, j].shape[0]),
                                       zorder=-diameters[i, j],
                                       alpha=intensity[i, j]))
+
                         start = end
+
                     if borders:
                         axes.add_patch(
                             Circle(positions[i, j], radius=sqrt(diameters[i, j] / d_max) / 3,
-                                   facecolor='None',
-                                   edgecolor='black', zorder=-diameters[i, j],
+                                   facecolor='None', edgecolor='black', zorder=-diameters[i, j],
                                    alpha=intensity[i, j]))
+
                 else:
                     if borders:
                         edge_color = 'black'
+
                     else:
                         edge_color = color_map(data_c[i, j])
+
                     axes.add_patch(Circle(positions[i, j], radius=sqrt(diameters[i, j] / d_max) / 3,
                                           facecolor=color_map(data_c[i, j]), edgecolor=edge_color,
                                           zorder=-diameters[i, j],
                                           alpha=intensity[i, j]))
+
             else:
                 if display_empty_nodes:
                     axes.add_patch(
@@ -488,7 +497,7 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
 def legend_or_bar(position_max, position_min, data_min, data_max, color_map, figure, axes,
                   labels=None):
     """
-    Plot the right color bar or legend if labels are provided
+    Plot the right color bar or legend if labels are provided.
 
     Parameters
     ----------
@@ -500,31 +509,29 @@ def legend_or_bar(position_max, position_min, data_min, data_max, color_map, fig
         Should be a list with two elements.
     data_min: float
         Minimum value of the nodes.
-        Ignored if labels are provided.
+        Ignored if ``labels`` are provided.
     data_max: float
         Maximum value of the nodes.
-        Ignored if labels are provided.
+        Ignored if ``labels`` are provided.
     color_map: colormap
         Color map to paint the nodes.
     figure: figure
-        Matplotlib figure
+        Matplotlib figure.
     axes: axes
-        Matplotlib axes
+        Matplotlib axes.
     labels: array_like (optional, default None)
         A 1D array containing labels without repeating, as a numeric value.
-
-    Returns
-    -------
-    None
 
     """
     plt.plot(position_max[0], position_max[1], ' ', alpha=0)
     plt.plot(position_min[0], position_min[1], ' ', alpha=0)
     ax_cb = make_axes_locatable(axes).new_horizontal(size="5%", pad=0.25)
+
     if labels is None:
         colorbar.ColorbarBase(ax_cb, cmap=color_map, orientation='vertical',
                               norm=colors.Normalize(vmin=data_min, vmax=data_max))
         figure.add_axes(ax_cb)
+
     else:
         axes.legend(bbox_to_anchor=(1, 1),
                     handles=[Patch(color=color_map(k), label=label) for k, label in

@@ -1,5 +1,13 @@
 """
-Package for generate discrete and low dimensional representation of the input data space using SOM
+NeuralMap, an Open Source implementation of Self Organizing Maps, with some extra features:
+ - Hexagonal and toroidal topology
+ - Customizable distance metric, neighbourhood function, and decay functions
+ - Data analysis and evaluation
+ - Relative Positions
+ - HDBSCAN clustering
+ - K-means or K-medoids clustering
+ - Specific visualizations
+
 """
 from collections import Counter
 
@@ -8,8 +16,8 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
 from numpy import arange, random, zeros, array, unravel_index, isnan, meshgrid, transpose, ogrid, \
-    cov, argsort, \
-    linspace, fill_diagonal, nan, nan_to_num, mean, argmin, where, isin, unique, quantile
+    cov, argsort, linspace, fill_diagonal, nan, nan_to_num, mean, argmin, where, isin, unique, \
+    quantile
 
 from numpy.linalg import norm, eig
 
@@ -22,17 +30,11 @@ from sklearn_extra.cluster import KMedoids
 from neural_map import _plot, _check_inputs, _decay_functions, _neighbourhood_functions
 
 
-def _identity(item):
-    """
-    Utility function to return the input value with no change
-    """
-    return item
-
-
 class NeuralMap:
-    """NueralMap Self Organizing Map initialization
+    """
+    NueralMap Self Organizing Map initialization.
 
-    Generates a discrete and low dimensional representation of the input data space
+    Generates a discrete and low dimensional representation of the input data space.
 
     Parameters
     ----------
@@ -65,18 +67,18 @@ class NeuralMap:
             * sokalsneath
             * yule
         (see scipy.spatial.distance)
-        If a function is passed, it must accept two arrays XA and XB of lengths m and n
-        with observations of the same dimensionality, that returns a matrix m x n
-        with the distances between all pairs of observations in XA and XB
-        (such as scipy.spatial.distance.cdist).
-        If the selected metric (string or function) takes some extra arguments,
-        they can be passed as a dictionary through **kwargs.
+        If a function is passed, it must accept two arrays ``XA`` and ``XB`` of lengths
+        ``m`` and ``n`` with observations of the same dimensionality, that returns
+        a matrix ``m x n`` with the distances between all pairs of observations in ``XA``
+        and ``XB`` (such as scipy.spatial.distance.cdist).
+        If the selected ``metric`` (string or function) takes some extra arguments,
+        they can be passed as a dictionary through ``**kwargs``.
     columns: int (optional, default 20)
-        X dimension of the map
+        Number of horizontal nodes.
     rows: int (optional, default 20)
-        Y dimension of the map
+        Number of vertical nodes.
     hexagonal: bool (optional, default True)
-        Whether the nodes are arranged in an hexagonal or squared grid
+        Whether the nodes are arranged in an hexagonal or squared grid.
     toroidal: bool (optional, default False)
         Whether the nodes are arranged in an toroidal or flat space.
         In a toroidal space, opposite edges of the map are connected.
@@ -94,7 +96,8 @@ class NeuralMap:
     seed: int (optional, default None)
         Random seed.
     **kwargs: dict (optional)
-        Extra arguments for the distance metric.
+        Extra arguments for the distance ``metric``.
+
     """
 
     def __init__(self,
@@ -109,7 +112,6 @@ class NeuralMap:
                  seed=None,
                  **kwargs
                  ):
-
         if seed is None:
             random.seed(None)
             seed = random.randint(low=0, high=10000)
@@ -124,50 +126,39 @@ class NeuralMap:
         _check_inputs.value_type(hexagonal, bool)
         _check_inputs.value_type(toroidal, bool)
         _check_inputs.value_type(seed, int)
-
         self._metric = metric
         self._kwargs = kwargs
 
         if isinstance(metric, str):
             def distance(first_array, second_array):
                 return cdist(first_array, second_array, self._metric, **self._kwargs)
+
         else:
             def distance(first_array, second_array):
                 return self._metric(first_array, second_array, **self._kwargs)
 
         self.distance = distance
-
         self.distance(array([[0., 1.]]), array([[1., 2.], [3., 4.]]))
-
         self.columns = columns
-
         self.rows = rows
-
         self.variables = variables
-
         self.hexagonal = hexagonal
-
         self.toroidal = toroidal
-
         self.width = self.columns
-
         self.height = self.rows
-
         self.seed = seed
         random.seed(self.seed)
 
         if weights is not None:
             _check_inputs.ndarray_and_shape(weights, (self.columns, self.rows, self.variables))
+
         else:
             weights = zeros((self.columns, self.rows, self.variables))
 
         self.weights = weights
-
         self.activation_map = zeros((self.columns, self.rows))
-
         self._adjacent_nodes_relative_positions = [[(1, 0), (0, 1), (-1, 0), (0, -1)],
                                                    [(1, 0), (0, 1), (-1, 0), (0, -1)]]
-
         self.positions = transpose(meshgrid(arange(self.columns), arange(self.rows)),
                                    axes=[2, 1, 0]).astype(float)
 
@@ -185,25 +176,26 @@ class NeuralMap:
                 relative_positions,
                 (self.columns, self.rows, self.variables)
             )
+
         else:
             relative_positions = self.positions.copy()
 
         self.relative_positions = relative_positions
-
         self.current_epoch = None
-
         self._unified_distance_matrix_cache = None
-
         self._hdbscan_cache = [(None, None, None)] * self.columns * self.rows
 
     def pca_weights_init(self, data):
-        """Initialize the weights to span the first two principal components.
+        """
+        Initialize the weights to span the first two principal components.
 
         It is recommended to normalize the data before initializing the weights
         and use the same normalization for the training data.
+
         """
         principal_components_length, principal_components = eig(cov(transpose(data)))
         components_order = argsort(-principal_components_length)
+
         for i, component_1 in enumerate(
                 linspace(-1, 1, self.columns) * principal_components[components_order[0]]):
             for j, component_2 in enumerate(
@@ -211,18 +203,26 @@ class NeuralMap:
                 self.weights[i, j] = component_1 + component_2
 
     def uniform_weights_init(self):
-        """Randomly initialize the weights with values between 0 and 1"""
+        """
+        Randomly initialize the weights with values between 0 and 1.
+
+        """
         self.weights = random.rand(self.columns, self.rows, self.variables)
 
     def standard_weights_init(self):
-        """Randomly initialize the weights with
-        a random distribution with mean of 0 and std of 1
+        """
+        Randomly initialize the weights with a random distribution with mean of 0 and std of 1.
+
         """
         self.weights = random.normal(0., 1., (self.columns, self.rows, self.variables))
 
     def pick_from_data_weights_init(self, data):
-        """Initialize the weights picking random samples from the input data"""
+        """
+        Initialize the weights picking random samples from the input data.
+
+        """
         indices = arange(data.shape[0])
+
         for i in range(self.columns):
             for j in range(self.rows):
                 self.weights[i, j] = data[random.choice(indices)]
@@ -240,19 +240,20 @@ class NeuralMap:
               radius_decay_function='linear',
               neighbourhood_function='gaussian',
               verbose=True):
-        """Train the SOM
+        """
+        Train the SOM
 
         Parameters
         ----------
         data: ndarray
             Data to learn by the SOM.
             Dimension should be (n_observations, variables),
-            where variables is the same value passed in the initialization method.
+            where ``variables`` is the same value passed in the initialization method.
         eval_data: ndarray (optional, default None)
             Data used to evaluate the SOM for each epoch.
             It should be normalize after split form train data.
             Dimension should be (n_observations, variables),
-            where variables is the same value passed in the initialization method.
+            where ``variables`` is the same value passed in the initialization method.
         n_epochs: int (optional, default 100)
             Number of epochs to train.
             In each epoch, all observations are processed exactly once, in a random sequence.
@@ -287,7 +288,7 @@ class NeuralMap:
                 * Final learning rate value
                 * Total number of epochs
                 * Current epoch number
-            And should return the learning rate value for the current epoch
+            And should return the learning rate value for the current epoch.
         radius_decay_function: string or function (optional, default 'linear')
             Function used to decrement the initial neighbourhood radius value over
             a number of epochs and reach the final neighbourhood radius value in the last one.
@@ -302,9 +303,9 @@ class NeuralMap:
                 * Final neighbourhood radius value
                 * Total number of epochs
                 * Current epoch number
-            And should return the neighbourhood radius value for the current epoch
+            And should return the neighbourhood radius value for the current epoch.
         neighbourhood_function: string or function (optional, default 'gaussian')
-            Function to compute the neighbourhood surrounding the best matching unit.
+            Function to compute the neighbourhood area surrounding the best matching unit.
             If a string is passed, it must match one of the followings:
                 * bubble
                 * conical
@@ -317,58 +318,78 @@ class NeuralMap:
                 * Cartesian coordinate of the best matching unit
                 * Neighbourhood radius
                 * Learning rate
-            And should return the update value of each node as a matrix
+            And should return the update value of each node as a matrix (columns, rows).
         verbose: bool (optional, default True)
-            Verbosity of training process
+            Verbosity of training process.
+
         """
+
+        # if it's not provided a value, it's calculated as half the minimum dimension of the map
         if initial_radius is None:
             initial_radius = min(self.width, self.height) / 2
 
+        # if the number of epochs is set to 1, use no decay function
         if n_epochs == 1:
             learning_rate_decay_function = _decay_functions.no_decay
             radius_decay_function = _decay_functions.no_decay
 
+        # restart u-matrix and hdbscan cahces
         self._unified_distance_matrix_cache = None
         self._hdbscan_cache = [(None, None, None)] * self.columns * self.rows
 
+        # get the learning rate decay function
         if learning_rate_decay_function == 'linear':
             learning_rate_decay_function = _decay_functions.linear
+
         elif learning_rate_decay_function == 'exponential':
             learning_rate_decay_function = _decay_functions.exponential
+
         elif learning_rate_decay_function == 'rational':
             learning_rate_decay_function = _decay_functions.rational
+
         elif learning_rate_decay_function == 'no_decay':
             learning_rate_decay_function = _decay_functions.no_decay
 
+        # get the radius decay function
         if radius_decay_function == 'linear':
             radius_decay_function = _decay_functions.linear
+
         elif radius_decay_function == 'exponential':
             radius_decay_function = _decay_functions.exponential
+
         elif radius_decay_function == 'rational':
             radius_decay_function = _decay_functions.rational
+
         elif radius_decay_function == 'no_decay':
             radius_decay_function = _decay_functions.no_decay
 
+        # get the neighbourhood function
         if neighbourhood_function == 'bubble':
             neighbourhood_function = _neighbourhood_functions.bubble
+
         elif neighbourhood_function == 'conical':
             neighbourhood_function = _neighbourhood_functions.conical
+
         elif neighbourhood_function == 'gaussian':
             neighbourhood_function = _neighbourhood_functions.gaussian
+
         elif neighbourhood_function == 'gaussian_cut':
             neighbourhood_function = _neighbourhood_functions.gaussian_cut
+
         elif neighbourhood_function == 'mexican_hat':
             neighbourhood_function = _neighbourhood_functions.mexican_hat
+
         elif neighbourhood_function == 'no_neighbourhood':
             neighbourhood_function = _neighbourhood_functions.no_neighbourhood
 
+        # check inputs
         _check_inputs.numpy_matrix(data, self.variables)
+
         if eval_data is not None:
             _check_inputs.numpy_matrix(eval_data, self.variables)
 
         _check_inputs.value_type(n_epochs, int)
         _check_inputs.positive(n_epochs)
-
         _check_inputs.value_type(initial_learning_rate, float)
         _check_inputs.positive(initial_learning_rate)
         _check_inputs.value_type(final_learning_rate, float)
@@ -377,13 +398,12 @@ class NeuralMap:
         _check_inputs.positive(initial_radius)
         _check_inputs.value_type(final_radius, float)
         _check_inputs.positive(final_radius)
-
         _check_inputs.function(learning_rate_decay_function)
         _check_inputs.function(radius_decay_function)
         _check_inputs.function(neighbourhood_function)
-
         _check_inputs.value_type(verbose, bool)
 
+        # get the weights initialization method
         if weights_init_method == 'standard':
             self.standard_weights_init()
 
@@ -396,66 +416,58 @@ class NeuralMap:
         elif weights_init_method == 'pick_from_data':
             self.pick_from_data_weights_init(data)
 
-        # se declara la lista que se va a utilizar para almacenar la distancia promedio de los
-        # bmu por cada época
+        # declare an array for quantization and topographic error of each epoch
         epochs_quantization_error = zeros(n_epochs)
         epochs_topographic_error = zeros(n_epochs)
 
-        # se genera la lista de índices de los datos de entrada sobre el que se va a iterar
+        # generate observation indices to iterate over
         indices = arange(len(data))
 
-        # se configura el estado aleatorio en base a la semilla calculada en el constructor
+        # set random state
         random.seed(self.seed)
 
-        #############################
+        # the next variables before the for loop will be used only in case of toroidal topology
 
-        # se declara el arreglo que va a contener las dimensiones del mapa
+        # array with map dimensions, do not confuse with the number of columns and rows
         dimensions = array([self.width, self.height])
 
-        # se declara la posición del centro del mapa
+        # map center position
         center = (self.columns // 2, self.rows // 2)
 
-        # se declara la lista sobre la que se va a almacenar el desplazamiento horizontal de cada
-        # itereación
-        y_displacement = zeros(self.rows, dtype='int')
+        # get indices of the update matrix
+        update_matrix_indices = ogrid[[slice(0, self.columns), slice(0, self.rows)]]
 
-        # se declara la lista sobre la que se va a almacenar el desplazamiento vertical de cada
-        # itereación
-        x_displacement = zeros(self.columns, dtype='int')
-
-        # se almcenan en una variable los índices de la mariz g
-        updata_matrix_indices = ogrid[[slice(0, self.columns), slice(0, self.rows)]]
-
-        # se inicializa con ceros la lista de correcciones en las posiciones de los nodos
+        # compute the corrections that each rows must have,
+        # if the bmu is in a row offset from the map center
         correction = zeros(self.rows, dtype='int')
-
-        # se calcula la corrección que debe tener cada fila cuando el bmu está defasado del centro
         correction[center[1] % 2:: 2] = (center[1] % 2) * 2 - 1
 
-        # por cada época...
         for epoch in range(n_epochs):
 
-            # ... se mezclan nuevamente las iteraciones
+            # set current epoch
+            self.current_epoch = epoch
+
+            # shuffles all observations
             random.shuffle(indices)
 
-            # se genera un nuevo estado aleatorio
+            # get a new random state, for the next epoch
             random.seed(epoch)
 
-            # se calcula la Learning Rate de la época
+            # compute the learning rate of this epoch
             learning_rate = learning_rate_decay_function(initial_learning_rate, final_learning_rate,
                                                          n_epochs, epoch)
 
-            # se calcula el Radius de la época
+            # compute the neighbourhood radius of this epoch
             radius = radius_decay_function(initial_radius, final_radius, n_epochs, epoch)
 
-            self.current_epoch = epoch
-
+            # print progress
             if verbose:
-                # se imprime el progreso
                 print('\nEpoch: ', epoch + 1, ' of ', n_epochs,
                       '    Learning rate: ', learning_rate,
                       '    Radius: ', radius)
 
+            # plot update matrix and relative positions displacement
+            # for the first iteration in each epoch
             plot_update = False
 
             # plt.scatter(self._rp[..., 0], self._rp[..., 1])
@@ -464,128 +476,126 @@ class NeuralMap:
             #             (self._rp[..., 1] + self._height / 3) % self._height)
             # plt.show()
 
+            # in case of having a toroidal topology the update matrix is the same for each iteration
+            # in every iteration, this matrix is rotated to match the bmu position
             update_matrix_over_center = neighbourhood_function(self.positions,
                                                                self.positions[center],
                                                                radius, learning_rate)
 
-            # para cada iteración...
             for i in indices:
-                # ... se toma el dato correspondiente a la iteración
-                ind = data[i]
 
-                # se calcula el nodo ganador, y su distancia con respecto al dato
+                # get best matching unit for a given observation
+                ind = data[i]
                 bmu = self.get_best_matching_unit(ind)
 
                 if self.toroidal:
 
-                    # se calcula la cantidad de nodos horizontal y vertical
-                    # que hay desde el centro del mapa al nodo ganador
-                    relative_indices = [bmu[0] - center[0], bmu[1] - center[1]]
+                    # The update matrix computed over the map center must be rotated to match the
+                    # bmu, and so emulate a toroidal space. For this, the matrix is reindexed,
+                    # subtracting to the original indices the corresponding horizontal and vertival
+                    # displacement. Also, if the topology is hexagonal and the row of the bmu is
+                    # offset from the row of the map center, it must be applied an extra correction
+                    # that is computed at the beginning of the training. Finally, the new positions
+                    # are rotated to fit the map dimensions.
 
-                    # se llena con el valur u la lista de desplazamientos horizontales
-                    y_displacement.fill(relative_indices[0])
+                    # computes the amount of columns and rows between the map center and the bmu
+                    offset = [bmu[0] - center[0], bmu[1] - center[1]]
 
-                    # se llena con el valur v la lista de desplazamientos verticales
-                    x_displacement.fill(relative_indices[1])
+                    # compute the offset correction for each row
+                    offset_correction = (self.hexagonal and offset[1] % 2) * correction
 
-                    # La matriz de actualizaciones (g) calculada sobre el centro del mapa debe
-                    # ser desplazada para que coincida con la bmu. De esta manera se logra emular
-                    # un espacio toroidal. Para eso se reindexan los elementos del arreglo,
-                    # restando de los índices originales (all_idcs) el desplazamiento horizontal y
-                    # vertical correspondiente (hor_disp, ver_disp). Además, cuando se trata de
-                    # topología hexagonal y el bmu está en una fila "defasada" del centro del mapa,
-                    # se debe hacer una corrección adicional, que es calculada al principio del
-                    # entrenamiento. Finalmente se calcula el resto con respecto a la cantidad de
-                    # nodos horizontal y verticalmente, para asegurar que los nuevos índices se
-                    # encuentren dentro de los límites.
-
-                    exceptions = (self.hexagonal and relative_indices[1] % 2) * correction
-
-                    # se reindexa la matriz g para que coincida con el nodo ganador
+                    # rotate update matrix to match its center with the bmu position
                     update_matrix = update_matrix_over_center[tuple([
-                        (updata_matrix_indices[0] - (y_displacement + exceptions)) % self.columns,
-                        (updata_matrix_indices[1] - x_displacement[:, None]) % self.rows
+                        (update_matrix_indices[0] - (offset[0] + offset_correction)) % self.columns,
+                        (update_matrix_indices[1] - offset[1][:, None]) % self.rows
                     ])]
 
-                    # se calcula la ubicación opuesta al nodo ganador
+                    # computes displacement for all the relative positions of neighbourhood nodes
+
+                    # get opposite point of the bmu relative position
                     anti_bmu = (self.relative_positions[bmu] + dimensions / 2) % dimensions
 
-                    # se calcula el cuadrante en el que está el nodo ganador con respecto a su
-                    # ubicación opuesta
-                    cuad = array(
-                        [self.relative_positions[bmu][0] - self.width / 2 > 0 or anti_bmu[0] < 1,
-                         self.relative_positions[bmu][1] - self.height / 2 > 0 or anti_bmu[
-                             1] < 1]) * 2 - 1
-
-                    # se calcula la matriz donde se indica la ubicación del nodo ganador al que
-                    # debe tender cada RP
-                    mod = (self.relative_positions * cuad < anti_bmu * cuad) * dimensions * cuad
-
-                    # se calcula el desplazamiento que debe aplicarse a cada RP
-                    # einsum('ij, ijk->ijk', g, (self._cart_coord[winner_node] - mod - self._rp))
-                    displacement = (self.relative_positions[bmu] - mod -
-                                    self.relative_positions) * update_matrix[..., None]
-
-                    anti_bmu = (self.positions[bmu] + dimensions / 2) % dimensions
-                    cuad = array([
-                        relative_indices[0] > 0 or anti_bmu[0] < 1,
-                        relative_indices[1] > 0 or anti_bmu[1] < 1
+                    # get the 'quadrant' the bmu is in, with respect to its opposite position
+                    quadrant = array([
+                        self.relative_positions[bmu][0] - self.width / 2 > 0 or anti_bmu[0] < 1,
+                        self.relative_positions[bmu][1] - self.height / 2 > 0 or anti_bmu[1] < 1
                     ]) * 2 - 1
-                    mod = (self.relative_positions[
-                               bmu] * cuad < anti_bmu * cuad) * dimensions * cuad
-                    displacement[bmu] = (self.positions[bmu] -
-                                         mod - self.relative_positions[bmu]) * update_matrix[bmu]
 
+                    # compute the matrix with the positions to which each node must tend
+                    mod = (self.relative_positions * quadrant < anti_bmu * quadrant) \
+                        * dimensions * quadrant
+
+                    # compute displacement for each node relative position
+                    displacement = (self.relative_positions[bmu] - mod - self.relative_positions) \
+                        * update_matrix[..., None]
+
+                    # compute displacement for bmu relative position
+
+                    # get opposite point of the bmu relative position
+                    anti_bmu = (self.positions[bmu] + dimensions / 2) % dimensions
+
+                    # get the 'quadrant' the bmu is in, with respect to its opposite position
+                    quadrant = array([
+                        offset[0] > 0 or anti_bmu[0] < 1,
+                        offset[1] > 0 or anti_bmu[1] < 1
+                    ]) * 2 - 1
+
+                    # compute the matrix with the positions to which each node must tend
+                    mod = (self.relative_positions[bmu] * quadrant < anti_bmu * quadrant) \
+                        * dimensions * quadrant
+
+                    # compute displacement for each node relative position
+                    displacement[bmu] = (self.positions[bmu] - mod - self.relative_positions[bmu]) \
+                        * update_matrix[bmu]
+
+                    # plot for easier debugging
                     if plot_update:
                         plot_update = False
                         _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
                                      self.relative_positions[bmu], self.relative_positions,
                                      displacement)
                         plt.show()
-                        # print((self._width, self._height, winner_node, self._cart_coord,
-                        # center, g, self._rp, '\n\n'))
 
-                    # se actualiza la matriz de RP
+                    # update relative positions
                     self.relative_positions += displacement
 
-                    # se corrige para que entre en las dimensiones del mapa
+                    # fits new relative positions into the map
                     self.relative_positions %= dimensions
 
                 else:
 
-                    # se calcula la matriz de actualizaciones
-                    update_matrix = neighbourhood_function(self.positions,
-                                                           self.positions[bmu],
-                                                           radius,
-                                                           learning_rate)
+                    # compute update matrix, with the proportion of change for each node
+                    update_matrix = neighbourhood_function(self.positions, self.positions[bmu],
+                                                           radius, learning_rate)
 
-                    # se calcula el desplazamiento que debe aplicarse a cada RP
-                    # despl = einsum('ij, ijk->ijk', g, winner_node - self._rp)
+                    # the relative positions of neighbourhood nodes tends towards
+                    # the bmu relative position
+                    displacement = (self.relative_positions[bmu] - self.relative_positions) \
+                        * update_matrix[..., None]
 
-                    # displacement = (self._positions[best_matching_unit] - self._rp) *
-                    # update_matrix[..., None]
-                    displacement = (self.relative_positions[bmu] -
-                                    self.relative_positions) * update_matrix[..., None]
-                    displacement[bmu] = (self.positions[bmu] -
-                                         self.relative_positions[bmu]) * update_matrix[bmu]
+                    # the bmu relative positions tends towards its absolute position
+                    displacement[bmu] = (self.positions[bmu] - self.relative_positions[bmu]) \
+                        * update_matrix[bmu]
 
+                    # plot for easier debugging
                     if plot_update:
                         plot_update = False
                         _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     self.positions[bmu],
-                                     self.relative_positions, displacement)
+                                     self.positions[bmu], self.relative_positions, displacement)
                         plt.show()
 
-                    # se actualiza la matriz de RP
+                    # update relative positions
                     self.relative_positions += displacement
 
-                # se actualizan los pesos de la red
+                # update weights
                 self.weights += (ind - self.weights) * update_matrix[..., None]
 
+            # evaluate the SOM with respect to the input data each epoch
             if eval_data is not None:
                 epochs_quantization_error[epoch], epochs_topographic_error[epoch] = self.evaluate(
                     eval_data)
 
+        # plot quantization error and topographic error evolution
         if eval_data is not None:
             print('\n\nQuantization error per epoch')
             print('first epoch: ', epochs_quantization_error[0])
@@ -603,26 +613,29 @@ class NeuralMap:
     def generate_activation_map(self, ind):
         """
         Compute the distance between the reference vector (ind) and all nodes
+
         """
-        self.activation_map = self.distance(ind.reshape([1, -1]), self.weights.reshape(
-            [self.weights.shape[0] * self.weights.shape[1], self.weights.shape[2]])).reshape(
-            [self.weights.shape[0], self.weights.shape[1]])
+        self.activation_map = self.distance(ind.reshape([1, -1]), self.weights.reshape([
+            self.weights.shape[0] * self.weights.shape[1],
+            self.weights.shape[2]
+        ])).reshape([self.weights.shape[0], self.weights.shape[1]])
 
         return self.activation_map
 
     def get_best_matching_unit(self, ind):
         """
         From the activation map, select the node with the minimum distance
-        and return its position in the 2D array
+        and return its position in the 2D array.
+
         """
         return unravel_index(self.generate_activation_map(ind).argmin(), self.activation_map.shape)
 
     def get_unified_distance_matrix(self):
         """
-        Compute the u-matrix of the SOM
+        Compute the u-matrix of the SOM.
 
         The u-matrix value of a particular node is the distance between
-        that node and all its neighbours, and the mean distance.
+        that node and all its adjacent neighbours, and the mean distance.
         The distance metric is provided in the initialization parameter.
 
         Returns
@@ -635,32 +648,21 @@ class NeuralMap:
                 The second value is the distance matrix between each pair of adjacent nodes.
                 Dimensions are (columns * rows, columns * rows).
                 The nan value is used to represent that a pair of nodes is not adjacent.
-        """
 
+        """
         if self._unified_distance_matrix_cache is not None:
             return self._unified_distance_matrix_cache
 
         adjacency_matrix = zeros((self.columns * self.rows, self.columns * self.rows)) * nan
         fill_diagonal(adjacency_matrix, 0.)
+        adjacency_count = len(self._adjacent_nodes_relative_positions[0])
+        unified_distance_matrix = zeros((self.columns, self.rows, 1 + adjacency_count))
 
-        # se calcula la cantidad de nodos adyacentes que tiene cada nodo
-        adjacency_length = len(self._adjacent_nodes_relative_positions[0])
-
-        # se inicializa la matriz de distancias unificadas con ceros
-        unified_distance_matrix = zeros((self.columns, self.rows, 1 + adjacency_length))
-
-        # para cada posición en x del mapa...
         for x_index in range(self.columns):
-
-            # ... para cada posición en y del mapa...
             for y_index in range(self.rows):
-
-                # ... se configura en 0 el contador de la cantidad de nodos adyacentes válidos
                 adjacent_nodes = 0
 
-                # para cada tupla de coordenadas relativas al nodo...
                 for k, (i, j) in enumerate(self._adjacent_nodes_relative_positions[y_index % 2]):
-
                     if self.toroidal:
                         neighbour = array([[self.weights[
                                                 (x_index + i + self.columns) % self.columns,
@@ -674,101 +676,84 @@ class NeuralMap:
                         neighbour = None
 
                     if neighbour is not None:
-
-                        # se calcula la distancia entre el nodo y su vecino
                         distance = self.distance(self.weights[x_index, y_index].reshape([1, -1]),
                                                  neighbour[0, 0].reshape([1, -1]))
-
-                        # se lo suma la distancia al valor que tiene la matriz para esa posición
                         unified_distance_matrix[x_index, y_index, k] = distance
-
-                        # se asigna la distancia calcular al valor que tiene la matriz para esa
-                        # posición
-                        unified_distance_matrix[x_index, y_index, adjacency_length] += distance
-
-                        # se incrementa en 1 la cuenta de nodos adyacentes, para calcular el
-                        # promedio
+                        unified_distance_matrix[x_index, y_index, adjacency_count] += distance
                         adjacent_nodes += 1
-
                         adjacency_matrix[x_index * self.rows + y_index,
                                          ((x_index + i + self.columns) % self.columns) * self.rows +
                                          (y_index + j + self.rows) % self.rows] = distance
 
                     else:
-                        # ... se asigna nan a esa posición de la matriz
                         unified_distance_matrix[x_index, y_index, k] = nan
 
-                # si el nodo tiene al menos un nodo adyacente...
                 if adjacent_nodes > 0:
+                    unified_distance_matrix[x_index, y_index, adjacency_count] /= adjacent_nodes
 
-                    # ... se aclcula el promedio de las distancias
-                    new_value = unified_distance_matrix[x_index, y_index, adjacency_length] / \
-                                adjacent_nodes
-                    unified_distance_matrix[x_index, y_index, adjacency_length] = new_value
-
-                # si no tiene ningún vecino...
                 else:
-
-                    # ... se asigna nan
-                    unified_distance_matrix[x_index, y_index, adjacency_length] = nan
+                    unified_distance_matrix[x_index, y_index, adjacency_count] = nan
 
         self._unified_distance_matrix_cache = unified_distance_matrix, adjacency_matrix
+
         return self._unified_distance_matrix_cache
 
     def analyse(self, data):
+        """
+        Analyse a set of observation using the SOM, computing the quantization error,
+        activation frequency and mean distance for each node.
 
-        # se checkea el conjunto de datos ingresado
+        Quantization error is the average distance between each node weights vector and all the
+        observations for which it's the BMU.
+
+        Activation frequency is the number of times that each node is BMU.
+
+        Mean distance is the average distance between each node weights vector and all the
+        observations.
+
+        Parameters
+        ----------
+            data: ndarray
+                Data to analyse.
+                Dimensions should be (n_obs, variables),
+                where ``variables`` is the same value passed in the initialization method.
+
+        Returns
+        -------
+            quantization_error, activation_frequency, mean_distance: ndarray, ndarray, ndarray
+
+        """
         _check_inputs.numpy_matrix(data, self.variables)
-
-        # se inicializa con ceros la matriz que representa la frecuencia de activación
+        quantization_error = zeros((self.columns, self.rows))
         activation_frequency = zeros((self.columns, self.rows))
-
-        # se inicializa con ceros la matriz que representa la distancia entre un nodo y los datos
-        # con los que es ganador
-        bmu_distance = zeros((self.columns, self.rows))
-
-        # se inicializa con ceros la matriz que representa la distancia media entre un nodo y
-        # todos los datos
         mean_distance = zeros((self.columns, self.rows))
 
-        # para cada dato...
         for ind in data:
-            # ... se determina el nodo ganador
             best_matching_unit = self.get_best_matching_unit(ind)
-
-            # se agrega 1 al contador de frecuencia de activación de ese nodo
             activation_frequency[best_matching_unit] += 1
-
-            # se suma la distancia que tuvo con el dato con el que ganó
-            bmu_distance[best_matching_unit] += self.activation_map[best_matching_unit]
-
-            # a la matriz de destancias medias, se le agrega el mapa de activación para x
+            quantization_error[best_matching_unit] += self.activation_map[best_matching_unit]
             mean_distance += self.activation_map
 
-        # s calcula la distancia promedio de los nodos con respecto a los datos con los que ganó
-        bmu_distance[activation_frequency > 0] /= activation_frequency[activation_frequency > 0]
-
-        # se asigna nan a los nodos que nunca fueron ganadores
-        bmu_distance[activation_frequency == 0] = nan
-
-        # si calcula el promedio de la distancia entre el nodo y todos los datos
+        quantization_error[activation_frequency > 0] /= \
+            activation_frequency[activation_frequency > 0]
+        quantization_error[activation_frequency == 0] = nan
         mean_distance /= len(data)
 
-        # se retorna las tres matrices
-        return activation_frequency, bmu_distance, mean_distance
+        return activation_frequency, quantization_error, mean_distance
 
     def map_attachments(self, data, attachments, aggregation_function=None):
-        """Map data attachments to the net and then apply
-        an aggregation function over each nodes mapped values.
+        """
+        Map data attachments to the SOM and then apply
+        an aggregation function over each node mapped values.
 
         Parameters
         ----------
         data: ndarray
-            Data to map their attachments
+            Data to map their attachments.
             Dimensions should be (n_obs, variables),
-            where variables is the same value passed in the initialization method.
+            where ``variables`` is the same value passed in the initialization method.
         attachments: ndarray
-            Data attachments to map to the SOM
+            Data attachments to map to the SOM.
             Dimensions should be (n_obs, ).
         aggregation_function: function (optional, default None)
             After map all data attachments, it's possible to apply a function to
@@ -779,60 +764,62 @@ class NeuralMap:
         -------
             Mapped values: ndarray
                 Matrix with mapped values for each node.
-                Dimensions are (columns, rows)
-                Each value depends on the aggregatin function.
+                Dimensions are (columns, rows).
+                Each value depends on the aggregation function.
+
         """
         if aggregation_function is None:
-            aggregation_function = _identity
+            def identity(input_value):
+                return input_value
+
+            aggregation_function = identity
 
         _check_inputs.numpy_matrix(data, self.variables)
         _check_inputs.length(data, attachments)
         _check_inputs.function(aggregation_function)
-
-        # map every attachment to the best matching unit of its observation
         dict_map = {(i, j): [] for i in range(self.rows) for j in range(self.columns)}
+
         for ind, attachment in zip(data, attachments):
             dict_map[tuple(self.get_best_matching_unit(ind))].append(attachment)
 
-        # apply the aggregation function for each node mapped values
         result = [[0.0] * self.rows for _ in range(self.columns)]
+
         for k, item in dict_map.items():
             result[k[0]][k[1]] = aggregation_function(item)
 
-        # transform to ndarray and return
         return array(result)
 
     def k_means(self, n_clusters=4):
-        """Cluster nodes, based on their weights vectors, using k-means++.
-
-        See sklearn.cluster.KMeans
+        """
+        Perform k-means++ clustering over the nodes based
+        on their weights vectors (see sklearn.cluster.KMeans).
 
         Returns
         -------
             labels, cluster_centers: ndarray, ndarray
                 The first value is the matrix of each node cluster label.
                 Dimensions are (columns, rows).
-                The second value is the centroids array.
+                The second value is an array with the clusters centroids.
+
         """
         _check_inputs.value_type(n_clusters, int)
         _check_inputs.positive(n_clusters)
-
-        clusters = KMeans(n_clusters=n_clusters, init="k-means++").fit(
-            self.weights.reshape(self.columns * self.rows, self.variables))
+        clusters = KMeans(n_clusters=n_clusters, init="k-means++") \
+            .fit(self.weights.reshape(self.columns * self.rows, self.variables))
 
         return clusters.labels_.reshape(self.columns, self.rows), clusters.cluster_centers_
 
     def k_medoids(self, n_clusters=4):
-        """Cluster nodes, based on their weights vectors, using k-medoids++.
-
-        See sklearn_extra.cluster.KMedoids
+        """Perform k-medoids++ clustering over the nodes based
+        on their weights vectors (see sklearn_extra.cluster.KMedoids).
 
         Returns
         -------
             labels, cluster_centers: ndarray, ndarray
                 The first value is the matrix of each node cluster label.
                 Dimensions are (columns, rows).
-                The second value is the centroids array.
+                The second value is an array with the clusters centroids.
+
         """
         _check_inputs.value_type(n_clusters, int)
         _check_inputs.positive(n_clusters)
@@ -846,9 +833,8 @@ class NeuralMap:
 
             metric = custom_metric
 
-        # inicializa la instancia de KMedoids
-        clusters = KMedoids(n_clusters=n_clusters, init="k-medoids++", metric=metric).fit(
-            self.weights.reshape(self.columns * self.rows, self.variables))
+        clusters = KMedoids(n_clusters=n_clusters, init="k-medoids++", metric=metric) \
+            .fit(self.weights.reshape(self.columns * self.rows, self.variables))
 
         return clusters.labels_.reshape(self.columns, self.rows), clusters.cluster_centers_
 
@@ -866,9 +852,9 @@ class NeuralMap:
         ----------
             min_cluster_size: int (optional, default 3)
                 Minimum valid amount of nodes in each cluster.
-                Should be greater than 0
+                Should be greater than 0.
             plot_condensed_tree: bool (optional, default True)
-                Plot the clusters hierarchy
+                Plot the clusters hierarchy.
 
         Returns
         -------
@@ -876,8 +862,9 @@ class NeuralMap:
                 The first value is the matrix of each node's cluster label.
                 If the node is an outlier, its label is -1.
                 Dimensions are (columns, rows).
-                The second value is the probability of each node to belong to its cluster
-                The third value is the probability of each node to be an outlier
+                The second value is the probability of each node to belong to its cluster.
+                The third value is the probability of each node to be an outlier.
+
         """
         _check_inputs.value_type(min_cluster_size, int)
         _check_inputs.positive(min_cluster_size - 1)
@@ -891,7 +878,6 @@ class NeuralMap:
         adjacency_matrix = self.get_unified_distance_matrix()[1]
         clusters = HDBSCAN(metric='precomputed', min_cluster_size=min_cluster_size, min_samples=2)
         clusters.fit(nan_to_num(adjacency_matrix, nan=1e8))
-
         labels = clusters.labels_
         probabilities = clusters.probabilities_
         outlier_scores = clusters.outlier_scores_
@@ -909,29 +895,30 @@ class NeuralMap:
 
     def evaluate(self, data):
         """
-        Evaluate the SOM trough quantization and topographic error.
+        Evaluate the SOM through quantization and topographic error.
 
-        Quantization error is the average distance between every observation and its bmu in the SOM.
+        Quantization error is the average distance between
+        each observation and their bmu in the SOM.
         Topographic error is the number of observations that their best matching unit are not
         adjacent to their second best matching unit, divided by the total number of observations.
 
         Parameters
         ----------
             data: ndarray
-                Observations with which the SOM is evaluated
+                Observations with which the SOM is evaluated.
                 Dimensions should be (n_obs, variables),
-                where variables is the same value passed in the initialization method.
+                where ``variables`` is the same value passed in the initialization method.
 
         Returns
         -------
             quantization_error, topographic error: ndarray, ndarray
-                The first value is the SOM quantization error, given the input data
-                Dimensions are (columns, row)
-                The second value is the SOM topographic error, given the input data
-                Dimensions are (columns, row)
+                The first value is the SOM quantization error, given the input data.
+                Dimensions are (columns, row).
+                The second value is the SOM topographic error, given the input data.
+                Dimensions are (columns, row).
+
         """
         _check_inputs.numpy_matrix(data, self.variables)
-
         topographic_error = 0
         quantization_error = 0
 
@@ -944,16 +931,13 @@ class NeuralMap:
             error = 1
 
             for (i, j) in self._adjacent_nodes_relative_positions[f_bmu[1] % 2]:
-
-                if (self.toroidal
-                        and s_bmu[0] == (f_bmu[0] + i + self.columns) % self.columns
+                if (self.toroidal and s_bmu[0] == (f_bmu[0] + i + self.columns) % self.columns
                         and s_bmu[1] == (f_bmu[1] + j + self.rows) % self.rows):
                     error = 0
 
                 if (not self.toroidal
                         and self.columns > f_bmu[0] + i >= 0 <= f_bmu[1] + j < self.rows
-                        and s_bmu[0] == f_bmu[0] + i
-                        and s_bmu[1] == f_bmu[1] + j):
+                        and s_bmu[0] == f_bmu[0] + i and s_bmu[1] == f_bmu[1] + j):
                     error = 0
 
             topographic_error += error
@@ -968,6 +952,7 @@ class NeuralMap:
         dictionary to the constructor method (with no need for further training).
 
         Also useful to save or serialize the SOM.
+
         """
         return {
             **{
@@ -987,49 +972,42 @@ class NeuralMap:
     def get_connections_and_reverse(self, min_cluster_size=3):
         """
         Get the distance matrix of all adjacent nodes that are in the same HDBSCAN cluster,
-        and also get the matrix of which connections are between opposites edges (only for toroidal
+        and also get the matrix of connections that are between opposites edges (only for toroidal
         topologies).
 
         Parameters
         ---------
             min_cluster_size: int (optional, default 3)
                 Minimum valid amount of nodes in each cluster.
-                Should be greater than 0
+                Should be greater than 0.
 
         Returns
         -------
             connections, reverse: ndarray, ndarray
                 The first value is the distance matrix of all adjacent nodes
                 that are in the same HDBSCAN cluster.
-                Dimensions are (columns * rows, columns * rows)
-                The second value is the matrix of which connections are between opposites edges.
-                Dimensions are (columns * rows, columns * rows)
+                Dimensions are (columns * rows, columns * rows).
+                The second value is the matrix of connections that are between opposites edges.
+                Dimensions are (columns * rows, columns * rows).
+
         """
-        clusters_labels = \
-            array(self.hdbscan(min_cluster_size=min_cluster_size, plot_condensed_tree=False))[
-                0
-            ].reshape(self.columns * self.rows)
-
-        # if restrictive_conf and self.toroidal == False: for i in [[0, 1, self.y], [self.y -
-        # 1, 2 * self.y - 2, 2 * self.y - 1], [-self.y, -self.y + 1, -2 * self.y], [-1, -2,
-        # -self.y - 1]]: if clusters_labels[i[0]] == -1 and clusters_labels[i[1]] ==
-        # clusters_labels[i[2]]: clusters_labels[i[0]] = clusters_labels[i[1]]
-
+        clusters_labels = array(self.hdbscan(
+            min_cluster_size=min_cluster_size,
+            plot_condensed_tree=False)
+        )[0].reshape(self.columns * self.rows)
         adjacency_matrix = self.get_unified_distance_matrix()[1]
-
         connections = zeros(adjacency_matrix.shape) * nan
         reverse = zeros(adjacency_matrix.shape)
-
         reshaped_rp = self.relative_positions.reshape([-1, 2])
+
         for i in range(adjacency_matrix.shape[0]):
             for j in range(adjacency_matrix.shape[1]):
-                if not isnan(adjacency_matrix[i, j]) and \
-                        clusters_labels[i] == clusters_labels[j] and \
-                        clusters_labels[i] >= 0 and i != j:
+                if not isnan(adjacency_matrix[i, j]) and clusters_labels[i] == clusters_labels[j] \
+                        and clusters_labels[i] >= 0 and i != j:
                     connections[i, j] = adjacency_matrix[i, j]
-                    if self.toroidal and \
-                            norm(reshaped_rp[i] - reshaped_rp[j]) >= min(self.columns,
-                                                                         self.rows) / 2:
+
+                    if self.toroidal and norm(reshaped_rp[i] - reshaped_rp[j]) >= \
+                            min(self.columns, self.rows) / 2:
                         reverse[i, j] = 1
                         reverse[j, i] = 1
 
@@ -1038,42 +1016,40 @@ class NeuralMap:
     def plot_analysis(self, data, cluster=True, min_cluster_size=3,
                       borders=True, display_empty_nodes=True, size=10):
         """
-        Plot the quantization error and activation frequency of each node
-        placed according to their relative positions
-        and draw their connections if they are in the same HDBSCAN cluster.
+        Plot the quantization error and activation frequency of each node placed according to their
+        relative positions and draw their connections if they are in the same HDBSCAN cluster.
 
         Parameters
         ----------
         data: ndarray
             Observations to map in the SOM.
-            Dimensions should be (n_obs, variables)
+            Dimensions should be (n_obs, variables).
         cluster: bool (optional, default True)
-            Display the connections between adjacent nodes that are in the same HBSCAN cluster.
+            Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
         min_cluster_size: int (optional, default True) (optional, default 3)
             Minimum valid amount of nodes in each HDBSCAN cluster.
             Should be greater than 0.
-            Ignored if cluster is 0.
+            Ignored if ``cluster`` is False.
         borders: bool (optional, default True)
-            Draw nodes borders
+            Draw nodes borders.
         display_empty_nodes: bool (optional, default True)
             Display nodes that have 0 activation frequency.
         size: int (optional, default 10)
-            Horizontal and vertical size of the plot
-        """
+            Horizontal and vertical size of the plot.
 
+        """
         connections, reverse = None, None
+
         if cluster:
             connections, reverse = self.get_connections_and_reverse(min_cluster_size)
 
         analysis = self.analyse(data)
         activation_frequency = analysis[0]
         quantization_error = analysis[1]
-
         _check_inputs.value_type(borders, bool)
         _check_inputs.value_type(display_empty_nodes, bool)
         _check_inputs.value_type(size, int)
         _check_inputs.positive(size)
-
         _plot.bubbles(activation_frequency, self.relative_positions, quantization_error, size=size,
                       borders=borders, title='RP-HDBSCAN quantization error',
                       connections=connections, reverse=reverse,
@@ -1091,33 +1067,36 @@ class NeuralMap:
         ----------
         data: ndarray
             Observations to map in the SOM.
-            Dimensions should be (n_obs, variables)
+            Dimensions should be (n_obs, variables).
         labels: array_like
             Array containing the data labels to map in the nodes.
-            Length should be n_obs
+            Length should be n_obs.
         labels_to_display: array_like (optional, default None)
             Array with labels to display.
             Useful when it's not necessary to plot all labels but
             it's necessary to maintain the activation frequency with respect to all observations.
+            Each label to show should be passed only once.
         cluster: bool (optional, default True)
-            Display the connections between adjacent nodes that are in the same HBSCAN cluster.
+            Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
         min_cluster_size: int (optional, default True) (optional, default 3)
             Minimum valid amount of nodes in each HDBSCAN cluster.
             Should be greater than 0.
             Ignored if cluster is 0.
         borders: bool (optional, default True)
-            Draw nodes borders
+            Draw nodes borders.
         display_empty_nodes: bool (optional, default True)
             Display nodes that have 0 activation frequency.
         size: int (optional, default 10)
-            Horizontal and vertical size of the plot
+            Horizontal and vertical size of the plot.
+
         """
         activation_frequency = self.analyse(data)[0]
         connections, reverse = None, None
+
         if cluster:
             connections, reverse = self.get_connections_and_reverse(min_cluster_size)
-        unique_labels = unique(labels)
 
+        unique_labels = unique(labels)
         _check_inputs.value_type(borders, bool)
         _check_inputs.value_type(display_empty_nodes, bool)
         _check_inputs.value_type(size, int)
@@ -1126,8 +1105,10 @@ class NeuralMap:
         def aggregation_function(item):
             res = zeros(unique_labels.shape[0])
             counted = Counter(item)
+
             for k, unique_label in enumerate(unique_labels):
                 res[k] = counted[unique_label]
+
             return res
 
         map_labels = self.map_attachments(data, labels, aggregation_function)
@@ -1136,23 +1117,23 @@ class NeuralMap:
             _plot.bubbles(activation_frequency, self.relative_positions, map_labels,
                           color_map=plt.cm.get_cmap('hsv', len(unique_labels) + 1), size=size,
                           borders=borders, norm=False, labels=unique_labels,
-                          title='RP-HDBSCAN   labels', connections=connections, reverse=reverse,
+                          title='RP-HDBSCAN labels', connections=connections, reverse=reverse,
                           display_empty_nodes=display_empty_nodes)
 
         else:
             labels_to_display_indices = where(isin(unique_labels, labels_to_display))[0]
-
             _check_inputs.positive(len(labels_to_display_indices))
-
-            _plot.bubbles(activation_frequency, self.relative_positions,
-                          map_labels[..., labels_to_display_indices].reshape(
-                              [activation_frequency.shape[0], activation_frequency.shape[1],
-                               len(labels_to_display_indices)]),
-                          color_map=plt.cm.get_cmap('hsv', len(
-                              unique_labels[labels_to_display_indices]) + 1), size=size,
-                          borders=borders, norm=False,
+            map_labels = map_labels[..., labels_to_display_indices].reshape([
+                activation_frequency.shape[0],
+                activation_frequency.shape[1],
+                len(labels_to_display_indices)
+            ])
+            _plot.bubbles(activation_frequency, self.relative_positions, map_labels,
+                          color_map=plt.cm
+                          .get_cmap('hsv', len(unique_labels[labels_to_display_indices]) + 1),
+                          size=size, borders=borders, norm=False,
                           labels=unique_labels[labels_to_display_indices],
-                          title='RP-HDBSCAN   labels', connections=connections, reverse=reverse,
+                          title='RP-HDBSCAN labels', connections=connections, reverse=reverse,
                           display_empty_nodes=display_empty_nodes)
 
     def plot_map_value(self, data, attached_values, func=mean, cluster=True, min_cluster_size=3,
@@ -1167,27 +1148,29 @@ class NeuralMap:
         ----------
         data: ndarray
             Observations to map in the SOM.
-            Dimensions should be (n_obs, variables)
+            Dimensions should be (n_obs, variables).
         attached_values: array_like
             Array containing the values associated to each observation.
-            Length should be n_obs
+            Length should be n_obs.
         func: function (optional, default mean)
             Aggregation function to apply after map the attached values in the nodes.
         cluster: bool (optional, default True)
-            Display the connections between adjacent nodes that are in the same HBSCAN cluster.
+            Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
         min_cluster_size: int (optional, default True) (optional, default 3)
             Minimum valid amount of nodes in each HDBSCAN cluster.
             Should be greater than 0.
             Ignored if cluster is 0.
         borders: bool (optional, default True)
-            Draw nodes borders
+            Draw nodes borders.
         display_empty_nodes: bool (optional, default True)
             Display nodes that have 0 activation frequency.
         size: int (optional, default 10)
-            Horizontal and vertical size of the plot
+            Horizontal and vertical size of the plot.
+
         """
         activation_frequency = self.analyse(data)[0]
         connections, reverse = None, None
+
         if cluster:
             connections, reverse = self.get_connections_and_reverse(min_cluster_size)
 
@@ -1197,7 +1180,7 @@ class NeuralMap:
         _check_inputs.positive(size)
         nodes_values = self.map_attachments(data, attached_values, func)
         _plot.bubbles(activation_frequency, self.relative_positions, nodes_values, size=size,
-                      borders=borders, norm=True, title='RP-HDBSCAN   attached values',
+                      borders=borders, norm=True, title='RP-HDBSCAN attached values',
                       connections=connections, reverse=reverse,
                       display_empty_nodes=display_empty_nodes)
 
@@ -1208,48 +1191,46 @@ class NeuralMap:
         Parameters
         ----------
         detailed: bool (optional, default True)
-            Whether it must plot the distance between each node and their adjacent ones,
-            or just the average
+            Whether it must plot the distance between each node and their adjacent ones
+            or just the average.
         borders: bool (optional, default True)
-            Draw nodes borders
+            Draw nodes borders.
         size: int (optional, default 10)
-            Horizontal and vertical size of the plot
+            Horizontal and vertical size of the plot.
+
         """
         _check_inputs.value_type(detailed, bool)
         _check_inputs.value_type(borders, bool)
         _check_inputs.value_type(size, int)
         _check_inputs.positive(size)
-
         unified_distance_matrix = self.get_unified_distance_matrix()[0]
 
         if detailed:
             _plot.tiles(self.positions, self.hexagonal, unified_distance_matrix,
-                        title='Distance between nodes',
-                        borders=borders,
-                        size=size)
+                        title='Distance between nodes', borders=borders, size=size)
 
         else:
             _plot.tiles(self.positions, self.hexagonal, unified_distance_matrix[..., -1],
-                        title='Distance between nodes',
-                        borders=borders, size=size)
+                        title='Distance between nodes', borders=borders, size=size)
 
     def plot_weights(self, scaler=None, weights_to_display=None, headers=None, borders=True,
                      size=10):
         """
-        Plot the nodes weights.
+        Plot the nodes weights vectors.
 
         Parameters
         ----------
         scaler: scaler (optional, default None)
-            sklearn scaler to apply inverse transform to weights
+            sklearn scaler to apply inverse transform to weights.
         weights_to_display: list (optional, default None)
-            List of weights to display
+            List of weights to display.
         headers: list (optional, default None)
             List of titles to put to each plot. They could be the original name of the weights.
         borders: bool (optional, default True)
-            Draw nodes borders
+            Draw nodes borders.
         size: int (optional, default 10)
-            Horizontal and vertical size of the plot
+            Horizontal and vertical size of the plot.
+
         """
         _check_inputs.value_type(borders, bool)
         _check_inputs.value_type(size, int)
@@ -1257,10 +1238,10 @@ class NeuralMap:
 
         if scaler is None:
             weights = self.weights.copy()
+
         else:
-            weights = scaler.inverse_transform(
-                self.weights.reshape(-1, self.weights.shape[2])).reshape(
-                self.weights.shape)
+            weights = scaler.inverse_transform(self.weights.reshape(-1, self.weights.shape[2])) \
+                .reshape(self.weights.shape)
 
         if weights_to_display is None:
             weights_to_display = list(range(weights.shape[2]))
@@ -1272,8 +1253,7 @@ class NeuralMap:
 
         for weight in weights_to_display:
             _plot.tiles(self.positions, self.hexagonal, weights[..., weight],
-                        title=headers[weight], borders=borders,
-                        size=size)
+                        title=headers[weight], borders=borders, size=size)
 
     def plot_weights_vector(self, node_index=(0, 0), xticks_labels=None, bars=True,
                             scatter=False, line=False):
@@ -1292,14 +1272,15 @@ class NeuralMap:
             Plot the weights vector using points.
         line: bool (optional, default False)
             Plot the weights vector using a line.
+
         """
         _check_inputs.value_type(node_index, tuple)
         _check_inputs.value_type(bars, bool)
         _check_inputs.value_type(scatter, bool)
         _check_inputs.value_type(line, bool)
-
         node = self.weights[node_index]
         plt.figure(figsize=(20, 5))
+
         if bars:
             plt.bar(list(range(node.shape[0])), node)
 
@@ -1317,15 +1298,13 @@ class NeuralMap:
         plt.xticks(ticks=list(range(node.shape[0])), labels=xticks_labels, rotation='vertical')
 
     def plot_cluster_weights_vectors(self, cluster=None, xticks_labels=None, min_cluster_size=3,
-                                     display_median=False,
-                                     display_mean=True,
-                                     display_lines=True):
+                                     display_median=False, display_mean=True, display_lines=True):
         """
-        Plot the weights vector of a HDBSCAN cluster of nodes or all nodes.
-        Also plot the nodes median or mean.
+        Plot the weights vector of a HDBSCAN cluster of nodes, or for all nodes.
+        Also plot the nodes weights vectors median or mean.
 
-        Paramteers
-        ---------
+        Parameters
+        ----------
         cluster: int (optional, default None)
             HDBSCAN cluster number to display.
             If nothing is provided, plot all nodes.
@@ -1340,14 +1319,12 @@ class NeuralMap:
             Plot the mean of the weights vectors.
         display_lines: bool (optional, default True)
             Plot the weights vector using a line.
-        """
 
+        """
         _check_inputs.value_type(display_median, bool)
         _check_inputs.value_type(display_mean, bool)
         _check_inputs.value_type(display_lines, bool)
-
         labels = self.hdbscan(plot_condensed_tree=False, min_cluster_size=min_cluster_size)[0]
-
         values = self.weights.reshape((-1, self.variables))
         cluster_title = "Weights vectors"
         alpha = 1.
@@ -1369,16 +1346,18 @@ class NeuralMap:
 
         for value in values:
             plt.scatter(list(range(self.variables)), value, alpha=alpha)
+
             if display_lines:
                 plt.plot(value, alpha=alpha / 2, zorder=-1)
 
         if display_median:
-            plt.scatter(list(range(self.variables)), quantile(values, 0.5, axis=0), color='black',
-                        s=50)
-            plt.scatter(list(range(self.variables)), quantile(values, 0.75, axis=0), color='black',
-                        s=50)
-            plt.scatter(list(range(self.variables)), quantile(values, 0.25, axis=0), color='black',
-                        s=50)
+            plt.scatter(list(range(self.variables)), quantile(values, 0.5, axis=0),
+                        color='black', s=50)
+            plt.scatter(list(range(self.variables)), quantile(values, 0.75, axis=0),
+                        color='black', s=50)
+            plt.scatter(list(range(self.variables)), quantile(values, 0.25, axis=0),
+                        color='black', s=50)
+
             if display_lines:
                 plt.plot(quantile(values, 0.5, axis=0), color='black', lw=2, zorder=-1)
                 plt.plot(quantile(values, 0.75, axis=0), color='black', lw=1, ls='--', zorder=-1)
@@ -1390,6 +1369,7 @@ class NeuralMap:
             plt.scatter(list(range(self.variables)), v_mean, color='black', s=50)
             plt.scatter(list(range(self.variables)), v_mean + 2 * v_std, color='black', s=50)
             plt.scatter(list(range(self.variables)), v_mean - 2 * v_std, color='black', s=50)
+
             if display_lines:
                 plt.plot(v_mean, color='black', lw=2)
                 plt.plot(v_mean + 2 * v_std, color='black', lw=1, ls='--')

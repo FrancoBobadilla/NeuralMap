@@ -1,5 +1,5 @@
 """
-Utility functions for computing the decay of some variable over time (steps)
+Utility functions for computing the decay of some variable over time (steps).
 
 Functions
 --------------
@@ -18,29 +18,29 @@ from numba import jit, float64
 def linear(init, final, total_steps, step):
     """
     Compute the linear interpolation between two given values
-    and return the required intermediate value
+    and return the required intermediate value.
 
     Parameters
     ----------
     init: float
-        First value
+        First value.
     final: float
-        Last value
+        Last value.
     total_steps: float
-        Number of intermediate points
+        Number of intermediate points.
     step: float
-        Intermediate point to compute
+        Intermediate point to compute.
 
     Raises
     ------
     ZeroDivisionError
-        Raised when `total_steps` is equal to 1
-        Instead use the `no_decay` function.
+        Raised when ``total_steps`` is equal to 1.
+        Instead use the ``no_decay`` function.
 
     Returns
     -------
     interpolation: float
-        Value of the `step` point in the interpolation
+        Value of the ``step`` point in the interpolation.
 
     Example
     -------
@@ -56,34 +56,34 @@ def linear(init, final, total_steps, step):
 def exponential(init, final, total_steps, step):
     """
     Compute the exponential interpolation between two given values
-    and return the required intermediate value
+    and return the required intermediate value.
 
     Parameters
     ----------
     init: float
-        First value
+        First value.
     final: float
-        Last value
+        Last value.
     total_steps: float
-        Number of intermediate points
+        Number of intermediate points.
     step: float
-        Intermediate point to compute
+        Intermediate point to compute.
 
     Raises
     ------
     ZeroDivisionError
-        Raised when `total_steps` is equal to 1 or `init` is equal to 0
-        Instead use the `no_decay` function.
+        Raised when ``total_steps`` is equal to 1 or ``init`` is equal to 0.
+        Instead use the ``no_decay`` function.
 
     Returns
     -------
     interpolation: float
-        Value of the `step` point in the interpolation
+        Value of the ``step`` point in the interpolation.
 
     Notes
     -----
     The exponential interpolation is given by an exponential function
-    that matches both ``(0, init)`` and ``(total_steps - 1, final)`` points
+    that matches both ``(0, init)`` and ``(total_steps - 1, final)`` points.
 
     .. math::
 
@@ -105,35 +105,35 @@ def exponential(init, final, total_steps, step):
 def rational(init, final, total_steps, step):
     """
     Compute the rational interpolation between two given values
-    and return the required intermediate value
+    and return the required intermediate value.
 
     Parameters
     ----------
     init: float
-        First value
+        First value.
     final: float
         Last value
-    total_steps: float
+    total_steps: float.
         Number of intermediate points
     step: float
-        Intermediate point to compute
+        Intermediate point to compute.
 
     Raises
     ------
     ZeroDivisionError
-        Raised when `steps + (total_steps - 1) / ((init / final) - 1)` is equal to 0
-        or when `final` is equal to 0
-        Instead use the `no_decay` function.
+        Raised when ``steps + (total_steps - 1) / ((init / final) - 1)`` is equal to 0
+        or when ``final`` is equal to 0.
+        Instead use the ``no_decay`` function.
 
     Returns
     -------
     interpolation: float
-        Value of the `step` point in the interpolation
+        Value of the ``step`` point in the interpolation.
 
     Notes
     -----
-    The rational interpolation is given by an simple rational function
-    that matches both ``(0, init)`` and ``(total_steps - 1, final)`` points
+    The rational interpolation is given by a simple rational function
+    that matches both ``(0, init)`` and ``(total_steps - 1, final)`` points.
 
     .. math::
 
@@ -153,33 +153,30 @@ def rational(init, final, total_steps, step):
 
 
 @jit(float64(float64, float64, float64, float64), nopython=True, fastmath=True)
-def no_decay(init, final, total_steps, step):
+def no_decay(init, _final, _total_steps, _step):
     """
-    Return the init value, regardless of all others
+    Return the init value, regardless of all others.
 
     Parameters
     ----------
     init: float
-        First value
-    final: float
-        Last value.
-        This argument is ignored
-    total_steps: float
-        Number of intermediate points.
-        This argument is ignored
-    step: float
-        Intermediate point to compute.
-        This argument is ignored
+        First value.
+    _final: Any
+        Unused value.
+    _total_steps: Any
+        Unused value.
+    _step: Any
+        Unused value.
 
     Returns
     -------
     init: float
-        Value entered in the `init` parameter
+        Value entered in the `init` parameter.
 
     Notes
     -----
-    Useful when it is needed a function that has the same firm as all others
-    decay functions, but it is no needed to compute any decay
+    Useful when it is needed a function that accepts four parameters as all others
+    decay functions, but it is no needed to compute any decay.
 
     """
     return init

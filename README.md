@@ -1,9 +1,9 @@
 # NeuralMap
 
-NeuralMap is a **data analysis** tool that generates **discrete**, **low dimensional** representation of the input data 
+NeuralMap is a **data analysis** tool to generate a **discrete**, **low-dimensional** representation of the input data 
 space using the **[Self Organizing Maps algorithm](https://en.wikipedia.org/wiki/Self-organizing_map)**. 
 
-This tool supports a **wide range of configurations** in its initialization and training process:
+This tool supports a **wide range of configurations**:
  - Custom **distance metric**
  - **Hexagonal or square** arrangement
  - **Toroidal or flat** topology
@@ -11,8 +11,8 @@ This tool supports a **wide range of configurations** in its initialization and 
  - Custom **neighbourhood functions**
  
 After training a **NeuralMap instance**, you will be able to get **useful information** about your data, by mapping 
-observations to the SOM, watching the **features distribution** over the map, analysing datasets the get the **quantization error**, 
-**activation frequency** and **mean distance** for each node, and **evaluating** the SOM.
+observations to the SOM, watching the **features distribution** over the map, analysing a dataset to get the
+**quantization error**, **activation frequency** and **mean distance** for each node, and **evaluating** the SOM.
 
 Since the use of SOM for **clustering** is very spread, this tool employs some common clustering algorithms:
  - [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/index.html)
@@ -34,12 +34,7 @@ NeuralMap has the following requirements:
  - hdbscan 0.8.26
  - scikit_learn 0.23.2
 
-You can install all of them by cloning master, and running inside the project directory the following command:
-```bash
-pip install -r requirements.txt
-```
-
-Finally, to install NeuralMap use:
+To install NeuralMap use:
 ```bash
 pip install neural-map
 ```
@@ -48,7 +43,7 @@ pip install neural-map
 
 After installing NeuralMap, **obtain** and **prepare** your dataset. For this example we will create a dataset with 10 
 [blobs](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_blobs.html) in a five 
-dimensional space and scale it to fit all points to the range [0, 1]:
+dimensional space and scale it to fit the observations to the range [0, 1]:
 ```python
 from sklearn import datasets, preprocessing
 
@@ -61,7 +56,7 @@ Then, **create** a NeuralMap instance and **train it** with the data:
 ```python
 from neural_map import NeuralMap
 
-nm = NeuralMap(4, 'euclidean', columns=10, rows=10)
+nm = NeuralMap(5, 'euclidean', columns=10, rows=10)
 nm.train(data, n_epochs=20)
 ```
 
@@ -69,7 +64,7 @@ Now you can obtain a **discrete representation**:
 ```python
 nm.plot_analysis(data)
 ```
-<img src="https://github.com/FrancoBobadilla/NeuralMap/raw/master/examples/images/RP-HDBSCAN.png" alt="RP-HDBSCAN" width=450>
+<img src="https://github.com/FrancoBobadilla/NeuralMap/raw/master/examples/images/RP-HDBSCAN.png" alt="RP-HDBSCAN">
 
 As you can see, NeuralMap was able to successfully **discover** and cluster all the **original blobs**.
 
@@ -77,15 +72,15 @@ It's also possible to get the **U-matrix**:
 ```python
 nm.plot_unified_distane_matrix(data)
 ```
-<img src="https://github.com/FrancoBobadilla/NeuralMap/raw/master/examples/images/U-matrix.png" alt="U-matrix" width=450>
+<img src="https://github.com/FrancoBobadilla/NeuralMap/raw/master/examples/images/U-matrix.png" alt="U-matrix">
 
 Here is also possible to recognize the 10 original blobs.
 
 ## Documentation
 
-For more details about NeuralMap, see the [NeuralMap documentation]().
+For more details, see the **[NeuralMap documentation]()**.
 
-If you have a question, please open an issue.
+If you have a **question**, please open an **issue**.
 
 ## Contributing
 
@@ -100,4 +95,3 @@ To **contribute**, do the following:
 NeuralMap is licensed under [MIT](https://choosealicense.com/licenses/mit/) License.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-

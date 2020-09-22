@@ -1,5 +1,5 @@
 """
-NeuralMap is a data analysis tool that generates discrete, low dimensional representation of the
+NeuralMap is a data analysis tool to generate discrete, low dimensional representation of the
 input data space using the Self Organizing Maps algorithm.
 
 Self Organizing Maps is a neural network that applies a non-supervised training algorithm to get a

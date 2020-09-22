@@ -237,7 +237,7 @@ class NeuralMap:
               initial_radius=None,
               final_radius=1.0,
               learning_rate_decay_function='linear',
-              radius_decay_function='linear',
+              radius_decay_function='exponential',
               neighbourhood_function='gaussian',
               verbose=True):
         """

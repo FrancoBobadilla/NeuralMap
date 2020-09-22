@@ -1,0 +1,9 @@
+numpy==1.18.3
+kneed==0.7.0
+joblib==0.14.1
+numba==0.50.1
+scikit_learn_extra==0.1.0b2
+matplotlib==3.2.1
+scipy==1.4.1
+hdbscan==0.8.26
+scikit_learn==0.23.2

@@ -26,6 +26,7 @@ to improve the interpretability of results and clusters recognition.
 ## Installation
 
 NeuralMap has the following requirements:
+ - python >= 3.6
  - numpy 1.18.3
  - numba 0.50.1
  - scikit_learn_extra 0.1.0b2

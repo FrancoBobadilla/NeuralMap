@@ -1,6 +1,4 @@
 numpy==1.18.3
-kneed==0.7.0
-joblib==0.14.1
 numba==0.50.1
 scikit_learn_extra==0.1.0b2
 matplotlib==3.2.1

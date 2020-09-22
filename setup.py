@@ -21,12 +21,15 @@ setuptools.setup(
     python_requires='>=3.6',
     license='MIT',
     keywords=[
-        'som',
-        'self-organizing maps',
-        'dimensionality reduction',
-        'machine learning',
+        'self-organizing-maps',
+        'dimensionality-reduction',
+        'machine-learning',
         'clustering',
-        'hdbscan'
+        'hdbscan',
+        'kmeans-clustering',
+        'kmedoids-clustering',
+        'data-analysis',
+        'unsupervised-learning'
     ],
     install_requires=[
         'hdbscan~=0.8.26',

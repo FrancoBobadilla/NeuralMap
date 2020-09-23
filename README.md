@@ -93,6 +93,6 @@ To **contribute**, do the following:
  
 ## License
 
-NeuralMap is licensed under [MIT](https://choosealicense.com/licenses/mit/) License.
+NeuralMap is licensed under **MIT license**.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)

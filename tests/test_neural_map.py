@@ -252,7 +252,3 @@ class PositionsTestCase(unittest.TestCase):
                 actual_inner_nodes += 1
 
         self.assertEqual(expected_inner_nodes, actual_inner_nodes, 'net is not properly connected')
-
-
-if __name__ == '__main__':
-    unittest.main()

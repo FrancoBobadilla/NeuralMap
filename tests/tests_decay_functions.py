@@ -75,7 +75,3 @@ class NoDecayTestCase(unittest.TestCase):
         second_epoch = self.tested_function(2., 1., 10., 1.)
         delta = abs(second_epoch - first_epoch)
         self.assertLessEqual(delta, TOLERANCE, 'wrong incremental values')
-
-
-if __name__ == '__main__':
-    unittest.main()

@@ -1,3 +1,13 @@
-from .tests_decay_functions import *
-from .test_neural_map import *
-from .tests_neghbourhood_functions import *
+"""
+Test suite for NeuralMap.
+
+Modules
+-------
+    test_neural_map:
+        Basic tests for main class
+    test_decay_functions:
+        Tests decay functions
+    tests_neighbourhood_functions:
+        Tests neighbourhood functions
+
+"""

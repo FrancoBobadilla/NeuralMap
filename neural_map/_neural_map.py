@@ -126,16 +126,16 @@ class NeuralMap:
         _check_inputs.value_type(hexagonal, bool)
         _check_inputs.value_type(toroidal, bool)
         _check_inputs.value_type(seed, int)
-        self._metric = metric
-        self._kwargs = kwargs
+        self.metric = metric
+        self.kwargs = kwargs
 
         if isinstance(metric, str):
             def distance(first_array, second_array):
-                return cdist(first_array, second_array, self._metric, **self._kwargs)
+                return cdist(first_array, second_array, self.metric, **self.kwargs)
 
         else:
             def distance(first_array, second_array):
-                return self._metric(first_array, second_array, **self._kwargs)
+                return self.metric(first_array, second_array, **self.kwargs)
 
         self.distance = distance
         self.distance(array([[0., 1.]]), array([[1., 2.], [3., 4.]]))
@@ -157,8 +157,8 @@ class NeuralMap:
 
         self.weights = weights
         self.activation_map = zeros((self.columns, self.rows))
-        self._adjacent_nodes_relative_positions = [[(1, 0), (0, 1), (-1, 0), (0, -1)],
-                                                   [(1, 0), (0, 1), (-1, 0), (0, -1)]]
+        self.adjacent_nodes_relative_positions = [[(1, 0), (0, 1), (-1, 0), (0, -1)],
+                                                  [(1, 0), (0, 1), (-1, 0), (0, -1)]]
         self.positions = transpose(meshgrid(arange(self.columns), arange(self.rows)),
                                    axes=[2, 1, 0]).astype(float)
 
@@ -166,7 +166,7 @@ class NeuralMap:
             self.positions[:, 0::2, 0] += 0.5
             self.positions[..., 1] *= (3 ** 0.5) * 0.5
             self.height *= (3 ** 0.5) * 0.5
-            self._adjacent_nodes_relative_positions = [
+            self.adjacent_nodes_relative_positions = [
                 [(1, 0), (1, 1), (0, 1), (-1, 0), (0, -1), (1, -1)],
                 [(1, 0), (0, 1), (-1, 1), (-1, 0), (-1, -1), (0, -1)]
             ]
@@ -507,7 +507,7 @@ class NeuralMap:
                     # rotate update matrix to match its center with the bmu position
                     update_matrix = update_matrix_over_center[tuple([
                         (update_matrix_indices[0] - (offset[0] + offset_correction)) % self.columns,
-                        (update_matrix_indices[1] - offset[1][:, None]) % self.rows
+                        (update_matrix_indices[1] - offset[1]) % self.rows  # hola
                     ])]
 
                     # computes displacement for all the relative positions of neighbourhood nodes
@@ -655,14 +655,14 @@ class NeuralMap:
 
         adjacency_matrix = zeros((self.columns * self.rows, self.columns * self.rows)) * nan
         fill_diagonal(adjacency_matrix, 0.)
-        adjacency_count = len(self._adjacent_nodes_relative_positions[0])
+        adjacency_count = len(self.adjacent_nodes_relative_positions[0])
         unified_distance_matrix = zeros((self.columns, self.rows, 1 + adjacency_count))
 
         for x_index in range(self.columns):
             for y_index in range(self.rows):
                 adjacent_nodes = 0
 
-                for k, (i, j) in enumerate(self._adjacent_nodes_relative_positions[y_index % 2]):
+                for k, (i, j) in enumerate(self.adjacent_nodes_relative_positions[y_index % 2]):
                     if self.toroidal:
                         neighbour = array([[self.weights[
                                                 (x_index + i + self.columns) % self.columns,
@@ -824,8 +824,8 @@ class NeuralMap:
         _check_inputs.value_type(n_clusters, int)
         _check_inputs.positive(n_clusters)
 
-        if isinstance(self._metric, str):
-            metric = self._metric
+        if isinstance(self.metric, str):
+            metric = self.metric
 
         else:
             def custom_metric(first_set, second_set):
@@ -930,7 +930,7 @@ class NeuralMap:
             s_bmu = unravel_index(argmin(activation_map), activation_map.shape)
             error = 1
 
-            for (i, j) in self._adjacent_nodes_relative_positions[f_bmu[1] % 2]:
+            for (i, j) in self.adjacent_nodes_relative_positions[f_bmu[1] % 2]:
                 if (self.toroidal and s_bmu[0] == (f_bmu[0] + i + self.columns) % self.columns
                         and s_bmu[1] == (f_bmu[1] + j + self.rows) % self.rows):
                     error = 0
@@ -957,7 +957,7 @@ class NeuralMap:
         return {
             **{
                 'variables': self.variables,
-                'metric': self._metric,
+                'metric': self.metric,
                 'columns': self.columns,
                 'rows': self.rows,
                 'hexagonal': self.hexagonal,
@@ -966,7 +966,7 @@ class NeuralMap:
                 'weights': self.weights,
                 'relative_positions': self.relative_positions
             },
-            **self._kwargs
+            **self.kwargs
         }
 
     def get_connections_and_reverse(self, min_cluster_size=3):

@@ -172,10 +172,7 @@ class NeuralMap:
             ]
 
         if relative_positions is not None:
-            _check_inputs.ndarray_and_shape(
-                relative_positions,
-                (self.columns, self.rows, self.variables)
-            )
+            _check_inputs.ndarray_and_shape(relative_positions, (self.columns, self.rows, 2))
 
         else:
             relative_positions = self.positions.copy()
@@ -324,9 +321,9 @@ class NeuralMap:
 
         """
 
-        # if it's not provided a value, it's calculated as half the minimum dimension of the map
+        # if it's not provided a value, it's calculated as half the maximum dimension of the map
         if initial_radius is None:
-            initial_radius = min(self.width, self.height) / 2
+            initial_radius = max(self.width, self.height) / 2
 
         # if the number of epochs is set to 1, use no decay function
         if n_epochs == 1:

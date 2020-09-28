@@ -40,7 +40,7 @@ To install NeuralMap use:
 pip install neural-map
 ```
 
-## Get started
+## Getting started
 
 After installing NeuralMap, **obtain** and **prepare** your dataset. For this example we will create a dataset with 10 
 [blobs](https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_blobs.html) in a five 
@@ -53,7 +53,7 @@ scaler = preprocessing.MinMaxScaler()
 data = scaler.fit_transform(blobs[0])
 ```
 
-Then, **create** a NeuralMap instance and **train it** with the data:
+Then, we have to **create** a NeuralMap instance and **train it** with the data:
 ```python
 from neural_map import NeuralMap
 
@@ -61,13 +61,13 @@ nm = NeuralMap(5, 'euclidean', columns=10, rows=10)
 nm.train(data, n_epochs=20)
 ```
 
-Now you can obtain a **discrete representation**:
+Now we can obtain a **discrete representation**:
 ```python
 nm.plot_analysis(data)
 ```
 <img src="https://github.com/FrancoBobadilla/NeuralMap/raw/master/examples/images/RP-HDBSCAN.png" alt="RP-HDBSCAN">
 
-As you can see, NeuralMap was able to successfully **discover** and cluster all the **original blobs**.
+NeuralMap was able to successfully **discover** and cluster all the **original blobs**.
 
 It's also possible to get the **U-matrix**:
 ```python

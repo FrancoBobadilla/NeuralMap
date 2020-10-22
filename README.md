@@ -63,7 +63,7 @@ nm = NeuralMap(5, 'euclidean', columns=10, rows=10)
 nm.train(data, n_epochs=20)
 ```
 
-Now we can obtain a **discrete representation** using the HB-SCAn over the codebook vectors and represented in the two dimensional space mapped trhough the Relative Psoitions:
+Now we can obtain a **discrete representation** using the HB-SCAN over the codebook vectors and represented in the two dimensional space mapped trhough the Relative Positions:
 ```python
 nm.plot_analysis(data)
 ```

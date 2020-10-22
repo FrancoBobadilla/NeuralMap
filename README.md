@@ -16,12 +16,12 @@ After training a **NeuralMap instance**, you will be able to get **useful inform
 observations to the SOM, watching the **features distribution** over the map, analysing a dataset to get the
 **quantization error**, **activation frequency** and **mean distance** for each node, and **evaluating** the SOM.
 
-Since the use of SOM for **clustering** is very spread, this tool employs some common clustering algorithms:
+Since the use of SOM for **clustering** is very spread, this tool employs some common clustering algorithms to search clusters into the SOM configuration, speeding up the search of clusterrs in the smoothed space representation achieved by the SOM codebook vectors rather than in the, possible, high dimensional imput sapce:
  - [HDBSCAN](https://hdbscan.readthedocs.io/en/latest/index.html)
  - [K-means](https://scikit-learn.org/stable/modules/generated/sklearn.cluster.KMeans.html)
  - [K-medoids](https://scikit-learn-extra.readthedocs.io/en/latest/generated/sklearn_extra.cluster.KMedoids.html)
 
-And also includes several highly customizable **visualization methods**, some of them based on the 
+As mentioned, it also includes several highly customizable **visualization methods**, some of them based on the 
 **[Relative Positions technique](https://www.researchgate.net/publication/6292810_Improving_cluster_visualization_in_self-organizing_maps_Application_in_gene_expression_data_analysis)** 
 to improve the interpretability of results and clusters recognition.
 

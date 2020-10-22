@@ -1,7 +1,7 @@
 # NeuralMap
 
-NeuralMap is a **data analysis** tool to generate a **discrete**, **low-dimensional** representation of the input data 
-space using the **[Self Organizing Maps algorithm](https://en.wikipedia.org/wiki/Self-organizing_map)**. 
+NeuralMap is  new Python implementation of the well-known autoorganizative artificial neural network, **[the Self Organizing Map](https://ieeexplore.ieee.org/document/58325)**, with the **[Relative Position (RP) Visualization method](https://www.sciencedirect.com/science/article/abs/pii/S0010482507000844?via%3Dihub)**. The RP is a node-adaptive attribute that moves in a two dimensional space mimicking the movements of the SOM's codebook vectors in the input space. In this way NeuralMap results in a **data analysis** tool that generates a **discrete**, **low-dimensional** representation of the input data as tSNE or UMAP tools, but with the added advantage of processing new inputs without retraining.. 
+
 
 This tool supports a **wide range of configurations**:
  - Custom **distance metric**
@@ -82,6 +82,12 @@ Here is also possible to recognize the 10 original blobs.
 For more details, see the **[NeuralMap documentation]()**.
 
 If you have a **question**, please open an **issue**.
+
+## Authors
+
+* **Elmer Andrés Fernández** - *Original Idea* - [Profile](https://www.researchgate.net/profile/Elmer_Fernandez) - [CIDIE]- [CONICET](http://www.conicet.gov.ar) - [UCC](http://www.ucc.edu.ar)
+* **Franco Bobadilla** - *Developer* - Universidad Católica de Córdoba
+* **Pablo Pastore** - *Advice* - Universidad Católica de Córdoba
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 # NeuralMap
 
-NeuralMap is  new Python implementation of the well-known autoorganizative artificial neural network, **[the Self Organizing Map](https://ieeexplore.ieee.org/document/58325)**, with the **[Relative Position (RP) Visualization method](https://www.sciencedirect.com/science/article/abs/pii/S0010482507000844?via%3Dihub)**. The RP is a node-adaptive attribute that moves in a two dimensional space mimicking the movements of the SOM's codebook vectors in the input space. In this way NeuralMap results in a **data analysis** tool that generates a **discrete**, **low-dimensional** representation of the input data as tSNE or UMAP tools, but with the added advantage of processing new inputs without retraining.. 
+NeuralMap is  new Python implementation of the well-known self organized artificial neural network, **[Self-Organizing Map (SOM)](https://ieeexplore.ieee.org/document/58325)**, with the **[Relative Position (RP) Visualization method](https://www.sciencedirect.com/science/article/abs/pii/S0010482507000844?via%3Dihub)**. The RP is a node-adaptive attribute that moves in a two dimensional space mimicking the movements of the SOM's codebook vectors in the input space. In this way NeuralMap results in a **data analysis** tool that generates a **discrete**, **low-dimensional** representation of the input data as tSNE or UMAP tools, but with the added advantage of processing new inputs without retraining.. 
 
 
 This tool supports a **wide range of configurations**:

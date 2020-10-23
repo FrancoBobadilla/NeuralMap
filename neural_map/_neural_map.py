@@ -103,8 +103,8 @@ class NeuralMap:
     def __init__(self,
                  variables,
                  metric,
-                 columns=20,
-                 rows=20,
+                 columns=10,
+                 rows=10,
                  hexagonal=True,
                  toroidal=False,
                  relative_positions=None,
@@ -147,7 +147,6 @@ class NeuralMap:
         self.width = self.columns
         self.height = self.rows
         self.seed = seed
-        random.seed(self.seed)
 
         if weights is not None:
             _check_inputs.ndarray_and_shape(weights, (self.columns, self.rows, self.variables))
@@ -181,6 +180,7 @@ class NeuralMap:
         self.current_epoch = None
         self._unified_distance_matrix_cache = None
         self._hdbscan_cache = [(None, None, None)] * self.columns * self.rows
+        random.seed(self.seed)
 
     def pca_weights_init(self, data):
         """
@@ -190,6 +190,7 @@ class NeuralMap:
         and use the same normalization for the training data.
 
         """
+        random.seed(self.seed)
         principal_components_length, principal_components = eig(cov(transpose(data)))
         components_order = argsort(-principal_components_length)
 
@@ -204,6 +205,7 @@ class NeuralMap:
         Randomly initialize the weights with values between 0 and 1.
 
         """
+        random.seed(self.seed)
         self.weights = random.rand(self.columns, self.rows, self.variables)
 
     def standard_weights_init(self):
@@ -211,6 +213,7 @@ class NeuralMap:
         Randomly initialize the weights with a random distribution with mean of 0 and std of 1.
 
         """
+        random.seed(self.seed)
         self.weights = random.normal(0., 1., (self.columns, self.rows, self.variables))
 
     def pick_from_data_weights_init(self, data):
@@ -218,6 +221,7 @@ class NeuralMap:
         Initialize the weights picking random samples from the input data.
 
         """
+        random.seed(self.seed)
         indices = arange(data.shape[0])
 
         for i in range(self.columns):
@@ -228,6 +232,7 @@ class NeuralMap:
               data,
               eval_data=None,
               n_epochs=100,
+              initial_epoch=0,
               weights_init_method='standard',
               initial_learning_rate=1.0,
               final_learning_rate=0.01,
@@ -254,6 +259,10 @@ class NeuralMap:
         n_epochs: int (optional, default 100)
             Number of epochs to train.
             In each epoch, all observations are processed exactly once, in a random sequence.
+        initial_epoch: int (optional, default 0)
+            Initial training epoch.
+            This might be useful when multiple training sessions are applied
+            over the same instance.
         weights_init_method: string (optional, default 'standard')
             Method to initialize weights. It should be one of the followings:
                 * pca_weights_init
@@ -387,6 +396,7 @@ class NeuralMap:
 
         _check_inputs.value_type(n_epochs, int)
         _check_inputs.positive(n_epochs)
+        _check_inputs.value_type(initial_epoch, int)
         _check_inputs.value_type(initial_learning_rate, float)
         _check_inputs.positive(initial_learning_rate)
         _check_inputs.value_type(final_learning_rate, float)
@@ -417,12 +427,6 @@ class NeuralMap:
         epochs_quantization_error = zeros(n_epochs)
         epochs_topographic_error = zeros(n_epochs)
 
-        # generate observation indices to iterate over
-        indices = arange(len(data))
-
-        # set random state
-        random.seed(self.seed)
-
         # the next variables before the for loop will be used only in case of toroidal topology
 
         # array with map dimensions, do not confuse with the number of columns and rows
@@ -439,10 +443,13 @@ class NeuralMap:
         correction = zeros(self.rows, dtype='int')
         correction[center[1] % 2:: 2] = (center[1] % 2) * 2 - 1
 
-        for epoch in range(n_epochs):
+        for epoch in range(initial_epoch, n_epochs):
 
             # set current epoch
             self.current_epoch = epoch
+
+            # generate observation indices to iterate over
+            indices = arange(len(data))
 
             # shuffles all observations
             random.shuffle(indices)

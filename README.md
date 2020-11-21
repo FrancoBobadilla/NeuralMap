@@ -50,7 +50,7 @@ dimensional space and scale it to fit the observations to the range [0, 1]:
 ```python
 from sklearn import datasets, preprocessing
 
-blobs = datasets.make_blobs(n_samples=1000, n_features=5, centers=10)
+blobs = datasets.make_blobs(n_samples=1000, n_features=5, centers=10, random_state=1)
 scaler = preprocessing.MinMaxScaler()
 data = scaler.fit_transform(blobs[0])
 ```
@@ -73,7 +73,7 @@ NeuralMap was able to successfully **discover** and cluster all the **original b
 
 It's also possible to get the **U-matrix**:
 ```python
-nm.plot_unified_distane_matrix(data)
+nm.plot_unified_distance_matrix()
 ```
 <img src="https://github.com/FrancoBobadilla/NeuralMap/raw/master/examples/images/U-matrix.png" alt="U-matrix">
 

@@ -93,8 +93,6 @@ class NeuralMap:
         Provided only when it's needed to load (and initialize) an already trained map.
         Nodes weights vectors.
         Dimension should be (columns, rows, variables).
-    seed: int (optional, default None)
-        Random seed.
     **kwargs: dict (optional)
         Extra arguments for the distance ``metric``.
 
@@ -109,13 +107,8 @@ class NeuralMap:
                  toroidal=False,
                  relative_positions=None,
                  weights=None,
-                 seed=None,
                  **kwargs
                  ):
-        if seed is None:
-            random.seed(None)
-            seed = random.randint(low=0, high=10000)
-            print('generated seed: ', seed)
 
         _check_inputs.value_type(variables, int)
         _check_inputs.positive(variables)
@@ -125,7 +118,6 @@ class NeuralMap:
         _check_inputs.positive(rows)
         _check_inputs.value_type(hexagonal, bool)
         _check_inputs.value_type(toroidal, bool)
-        _check_inputs.value_type(seed, int)
         self.metric = metric
         self.kwargs = kwargs
 
@@ -146,7 +138,6 @@ class NeuralMap:
         self.toroidal = toroidal
         self.width = self.columns
         self.height = self.rows
-        self.seed = seed
 
         if weights is not None:
             _check_inputs.ndarray_and_shape(weights, (self.columns, self.rows, self.variables))
@@ -180,7 +171,6 @@ class NeuralMap:
         self.current_epoch = None
         self._unified_distance_matrix_cache = None
         self._hdbscan_cache = [(None, None, None)] * self.columns * self.rows
-        random.seed(self.seed)
 
     def pca_weights_init(self, data):
         """
@@ -190,7 +180,6 @@ class NeuralMap:
         and use the same normalization for the training data.
 
         """
-        random.seed(self.seed)
         principal_components_length, principal_components = eig(cov(transpose(data)))
         components_order = argsort(-principal_components_length)
 
@@ -205,7 +194,6 @@ class NeuralMap:
         Randomly initialize the weights with values between 0 and 1.
 
         """
-        random.seed(self.seed)
         self.weights = random.rand(self.columns, self.rows, self.variables)
 
     def standard_weights_init(self):
@@ -213,7 +201,6 @@ class NeuralMap:
         Randomly initialize the weights with a random distribution with mean of 0 and std of 1.
 
         """
-        random.seed(self.seed)
         self.weights = random.normal(0., 1., (self.columns, self.rows, self.variables))
 
     def pick_from_data_weights_init(self, data):
@@ -221,7 +208,6 @@ class NeuralMap:
         Initialize the weights picking random samples from the input data.
 
         """
-        random.seed(self.seed)
         indices = arange(data.shape[0])
 
         for i in range(self.columns):
@@ -241,6 +227,7 @@ class NeuralMap:
               learning_rate_decay_function='linear',
               radius_decay_function='exponential',
               neighbourhood_function='gaussian',
+              seed=1,
               verbose=True):
         """
         Train the SOM
@@ -325,6 +312,8 @@ class NeuralMap:
                 * Neighbourhood radius
                 * Learning rate
             And should return the update value of each node as a matrix (columns, rows).
+        seed: int or None (optional, default 1)
+            Random seed.
         verbose: bool (optional, default True)
             Verbosity of training process.
 
@@ -388,6 +377,11 @@ class NeuralMap:
         elif neighbourhood_function == 'no_neighbourhood':
             neighbourhood_function = _neighbourhood_functions.no_neighbourhood
 
+        if seed is None:
+            random.seed(None)
+            seed = random.randint(low=0, high=1000000)
+            print('generated seed: ', seed)
+
         # check inputs
         _check_inputs.numpy_matrix(data, self.variables)
 
@@ -408,19 +402,24 @@ class NeuralMap:
         _check_inputs.function(learning_rate_decay_function)
         _check_inputs.function(radius_decay_function)
         _check_inputs.function(neighbourhood_function)
+        _check_inputs.value_type(seed, int)
         _check_inputs.value_type(verbose, bool)
 
         # get the weights initialization method
         if weights_init_method == 'standard':
+            random.seed(seed)
             self.standard_weights_init()
 
         elif weights_init_method == 'uniform':
+            random.seed(seed)
             self.uniform_weights_init()
 
         elif weights_init_method == 'pca':
+            random.seed(seed)
             self.pca_weights_init(data)
 
         elif weights_init_method == 'pick_from_data':
+            random.seed(seed)
             self.pick_from_data_weights_init(data)
 
         # declare an array for quantization and topographic error of each epoch
@@ -451,11 +450,18 @@ class NeuralMap:
             # generate observation indices to iterate over
             indices = arange(len(data))
 
+            if self.current_epoch == 0:
+
+                # generate a new random state using the passed seed
+                random.seed(seed)
+
+            else:
+
+                # each epoch generate a new random state
+                random.seed(epoch)
+
             # shuffles all observations
             random.shuffle(indices)
-
-            # get a new random state, for the next epoch
-            random.seed(epoch)
 
             # compute the learning rate of this epoch
             learning_rate = learning_rate_decay_function(initial_learning_rate, final_learning_rate,
@@ -544,20 +550,22 @@ class NeuralMap:
                         offset[1] > 0 or anti_bmu[1] < 1
                     ]) * 2 - 1
 
-                    # compute the matrix with the positions to which each node must tend
+                    # compute the matrix with the positions to which the bmu must tend
                     mod = (self.relative_positions[bmu] * quadrant < anti_bmu * quadrant) \
                         * dimensions * quadrant
 
-                    # compute displacement for each node relative position
+                    # compute displacement for bmu relative position
                     displacement[bmu] = (self.positions[bmu] - mod - self.relative_positions[bmu]) \
                         * update_matrix[bmu]
 
                     # plot for easier debugging
-                    if plot_update:
+                    if plot_update and verbose:
                         plot_update = False
                         _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
                                      self.relative_positions[bmu], self.relative_positions,
                                      displacement)
+                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                                     None, None, None)
                         plt.show()
 
                     # update relative positions
@@ -582,11 +590,25 @@ class NeuralMap:
                         * update_matrix[bmu]
 
                     # plot for easier debugging
-                    if plot_update:
+                    if plot_update and verbose:
                         plot_update = False
-                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     self.positions[bmu], self.relative_positions, displacement)
+                        print("\nInput vector: ")
+                        print("(" + str(i) + "): " + str(ind))
+                        print("\nActivation map: ")
+                        _plot.update(self.positions, self.hexagonal, self.activation_map,
+                                     dimensions,
+                                     None, None,
+                                     displacement)
                         plt.show()
+                        print("\nBest Matching Unit: ")
+                        print(str(bmu) + ": " + str(self.weights[bmu]))
+                        print("\nUpdate of BMU and its neighbourhood: ")
+                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                                     None, None,
+                                     displacement)
+                        # self.relative_positions[bmu], self.relative_positions,
+                        plt.show()
+                        print("----------------------------------------------------------------\n")
 
                     # update relative positions
                     self.relative_positions += displacement
@@ -966,7 +988,6 @@ class NeuralMap:
                 'rows': self.rows,
                 'hexagonal': self.hexagonal,
                 'toroidal': self.toroidal,
-                'seed': self.seed,
                 'weights': self.weights,
                 'relative_positions': self.relative_positions
             },
@@ -1188,7 +1209,7 @@ class NeuralMap:
                       connections=connections, reverse=reverse,
                       display_empty_nodes=display_empty_nodes)
 
-    def plot_unified_distance_matrix(self, detailed=True, borders=True, size=10):
+    def plot_unified_distance_matrix(self, detailed=True, borders=True, size=10, grid=False):
         """
         Plot the u-matrix.
 
@@ -1201,6 +1222,8 @@ class NeuralMap:
             Draw nodes borders.
         size: int (optional, default 10)
             Horizontal and vertical size of the plot.
+        grid: bool (optional, default False)
+            Plot a grid over the nodes.
 
         """
         _check_inputs.value_type(detailed, bool)
@@ -1211,14 +1234,14 @@ class NeuralMap:
 
         if detailed:
             _plot.tiles(self.positions, self.hexagonal, unified_distance_matrix,
-                        title='Distance between nodes', borders=borders, size=size)
+                        title='Distance between nodes', borders=borders, size=size, grid=grid)
 
         else:
             _plot.tiles(self.positions, self.hexagonal, unified_distance_matrix[..., -1],
-                        title='Distance between nodes', borders=borders, size=size)
+                        title='Distance between nodes', borders=borders, size=size, grid=grid)
 
     def plot_weights(self, scaler=None, weights_to_display=None, headers=None, borders=True,
-                     size=10):
+                     size=10, grid=False):
         """
         Plot the nodes weights vectors.
 
@@ -1234,6 +1257,8 @@ class NeuralMap:
             Draw nodes borders.
         size: int (optional, default 10)
             Horizontal and vertical size of the plot.
+        grid: bool (optional, default False)
+            Plot a grid over the nodes.
 
         """
         _check_inputs.value_type(borders, bool)
@@ -1257,7 +1282,7 @@ class NeuralMap:
 
         for weight in weights_to_display:
             _plot.tiles(self.positions, self.hexagonal, weights[..., weight],
-                        title=headers[weight], borders=borders, size=size)
+                        title=headers[weight], borders=borders, size=size, grid=grid)
 
     def plot_weights_vector(self, node_index=(0, 0), xticks_labels=None, bars=True,
                             scatter=False, line=False):

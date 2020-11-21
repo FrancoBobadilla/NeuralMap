@@ -120,9 +120,17 @@ def value_type(value, types):
 
     """
     if not isinstance(value, types):
+        if isinstance(types, (tuple, list)):
+            string_types = types[0].__name__
+            for i in range(1, len(types)):
+                string_types += ' or ' + types[i].__name__
+
+        else:
+            string_types = types.__name__
+
         raise ValueError(
             'Value {value} is {value_type}, but should be {types}!'
-            .format(value=value, value_type=type(value), types=types)
+            .format(value=value, value_type=type(value).__name__, types=string_types)
         )
 
     return True
@@ -180,7 +188,7 @@ def function(func):
     if not callable(func):
         raise ValueError(
             'Value {func} is {value_type}, but should be callable!'
-            .format(func=func, value_type=type(func)))
+            .format(func=func, value_type=type(func).__name__))
 
     return True
 
@@ -218,7 +226,7 @@ def numpy_matrix(data, expected_len):
     if not isinstance(data, ndarray):
         raise ValueError(
             'Input data is {data_type}, but should be {types}!'
-            .format(data_type=type(data), types=ndarray)
+            .format(data_type=type(data).__name__, types=ndarray.__name__)
         )
 
     if not len(data.shape) == 2:

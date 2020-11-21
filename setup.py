@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='neural_map',
-    version="0.0.5",
+    version="0.0.6",
     author="Franco José Bobadilla",
     author_email='1709673@ucc.edu.ar',
     description='NeuralMap is a data analysis tool based on Self-Organizing Maps',
@@ -32,12 +32,12 @@ setuptools.setup(
         'unsupervised-learning'
     ],
     install_requires=[
-        'hdbscan~=0.8.26',
-        'scipy~=1.4.1',
-        'matplotlib~=3.2.1',
-        'scikit_learn_extra~=0.1.0b2',
-        'numpy~=1.18.3',
-        'numba~=0.50.1',
-        'scikit_learn~=0.23.2'
+        'hdbscan',
+        'scipy',
+        'matplotlib',
+        'numpy',
+        'numba',
+        'scikit_learn',
+        'scikit_learn_extra'
     ],
 )

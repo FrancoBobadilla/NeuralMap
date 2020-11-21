@@ -60,8 +60,8 @@ def bubble(positions, bmu, radius, learning_rate):
 
     for i in range(positions.shape[0]):
         for j in range(positions.shape[1]):
-            if ((positions[i, j, 0] - bmu[0]) ** 2 + (
-                    positions[i, j, 1] - bmu[1]) ** 2) / radius ** 2 < 1:
+            if (positions[i, j, 0] - bmu[0]) ** 2 + (positions[i, j, 1] - bmu[1]) ** 2 - \
+                    radius ** 2 <= 0:
                 res[i, j] = learning_rate
 
             else:

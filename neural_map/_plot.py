@@ -18,8 +18,8 @@ from matplotlib.patches import Polygon, RegularPolygon, Circle, Wedge, Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-def update(positions, hexagonal, data, dimensions, bmu, relative_positions, displacement,
-           color_map=plt.cm.get_cmap('RdYlGn_r')):
+def update(positions, hexagonal, data, dimensions, bmu=None, relative_positions=None,
+           displacement=None, color_map=plt.cm.get_cmap('RdYlGn_r')):
     """
     Plot the update value of each node and their relative position displacement.
 
@@ -36,13 +36,13 @@ def update(positions, hexagonal, data, dimensions, bmu, relative_positions, disp
     dimensions: array_like
         Horizontal and vertical measure of the map in the virtual space.
         Dimensions should be (2).
-    bmu: tuple or array_like
+    bmu: tuple or array_like (optional, default None)
         Cartesian coordinate of the best matching unit in the 2D virtual space.
         Dimensions should be (2).
-    relative_positions: ndarray
+    relative_positions: ndarray (optional, default None)
         Cartesian coordinates of the relative positions of the nodes.
         Dimensions should be (x, y, 2).
-    displacement: array_like
+    displacement: array_like (optional, default None)
         Displacement vector of each node over the relative positions space.
         Dimensions should be (x, y, 2).
     color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
@@ -90,20 +90,20 @@ def update(positions, hexagonal, data, dimensions, bmu, relative_positions, disp
                                facecolor=color_map(data_c[i, j]),
                                edgecolor=color_map(data_c[i, j])))
 
-    axes.add_patch(Circle(bmu, radius=radius / 3, facecolor='white', edgecolor='white'))
-    axes.add_patch(
-        Circle((bmu + dimensions / 2) % dimensions, radius=radius / 3, facecolor='black',
-               edgecolor='black'))
-    axes.quiver(relative_positions[..., 0], relative_positions[..., 1], displacement[..., 0],
-                displacement[..., 1],
-                angles='xy', scale_units='xy', scale=1, zorder=10)
+    if bmu is not None:
+        axes.add_patch(Circle(bmu, radius=radius / 3, facecolor='white', edgecolor='white'))
+        axes.add_patch(Circle((bmu + dimensions / 2) % dimensions, radius=radius / 3,
+                              facecolor='black', edgecolor='black'))
+    if relative_positions is not None and displacement is not None:
+        axes.quiver(relative_positions[..., 0], relative_positions[..., 1], displacement[..., 0],
+                    displacement[..., 1], angles='xy', scale_units='xy', scale=1, zorder=10)
     legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
                   [positions[..., 0].min(), positions[..., 1].min()],
                   data_min, data_max, color_map, figure, axes)
 
 
 def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, borders=False,
-          norm=True, labels=None, intensity=None, title=None):
+          norm=True, labels=None, intensity=None, title=None, grid=False):
     """
     Plot the map with nodes having colors according to their values (or set of values).
     Nodes have an hexagonal or squared shape that completely fill the space.
@@ -136,6 +136,8 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
         Values should be in the range [0, 1].
     title: string (optional, default None)
         Plot some title.
+    grid: bool (optional, default False)
+        Plot a grid over the nodes.
 
     """
     if intensity is None:
@@ -320,6 +322,8 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                        orientation=orientation, facecolor=color_map(data_c[i, j]),
                                        edgecolor=edge_color, alpha=intensity[i, j]))
 
+    if grid:
+        plt.grid()
     legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
                   [positions[..., 0].min(), positions[..., 1].min()],
                   data_min, data_max, color_map, figure, axes, labels=labels)
@@ -497,7 +501,7 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
 def legend_or_bar(position_max, position_min, data_min, data_max, color_map, figure, axes,
                   labels=None):
     """
-    Plot the right color bar or legend if labels are provided.
+    Plot the color bar or legend if labels are provided at the right of the main plot.
 
     Parameters
     ----------

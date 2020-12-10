@@ -16,10 +16,7 @@ from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 
 from numpy import arange, random, zeros, array, unravel_index, isnan, meshgrid, transpose, ogrid, \
-    cov, argsort, linspace, fill_diagonal, nan, nan_to_num, mean, argmin, where, isin, unique, \
-    quantile
-
-from numpy.linalg import norm, eig
+    fill_diagonal, nan, nan_to_num, argmin, where, isin, unique, quantile
 
 from scipy.spatial.distance import cdist
 
@@ -27,7 +24,8 @@ from hdbscan import HDBSCAN
 
 from sklearn_extra.cluster import KMedoids
 
-from neural_map import _plot, _check_inputs, _decay_functions, _neighbourhood_functions
+from neural_map import _plot, _check_inputs, _decay_functions, _neighbourhood_functions, \
+    _weight_init_functions
 
 
 class NeuralMap:
@@ -73,9 +71,9 @@ class NeuralMap:
         and ``XB`` (such as scipy.spatial.distance.cdist).
         If the selected ``metric`` (string or function) takes some extra arguments,
         they can be passed as a dictionary through ``**kwargs``.
-    columns: int (optional, default 20)
+    columns: int (optional, default 10)
         Number of horizontal nodes.
-    rows: int (optional, default 20)
+    rows: int (optional, default 10)
         Number of vertical nodes.
     hexagonal: bool (optional, default True)
         Whether the nodes are arranged in an hexagonal or squared grid.
@@ -172,54 +170,11 @@ class NeuralMap:
         self._unified_distance_matrix_cache = None
         self._hdbscan_cache = [(None, None, None)] * self.columns * self.rows
 
-    def pca_weights_init(self, data):
-        """
-        Initialize the weights to span the first two principal components.
-
-        It is recommended to normalize the data before initializing the weights
-        and use the same normalization for the training data.
-
-        """
-        principal_components_length, principal_components = eig(cov(transpose(data)))
-        components_order = argsort(-principal_components_length)
-
-        for i, component_1 in enumerate(
-                linspace(-1, 1, self.columns) * principal_components[components_order[0]]):
-            for j, component_2 in enumerate(
-                    linspace(-1, 1, self.rows) * principal_components[components_order[1]]):
-                self.weights[i, j] = component_1 + component_2
-
-    def uniform_weights_init(self):
-        """
-        Randomly initialize the weights with values between 0 and 1.
-
-        """
-        self.weights = random.rand(self.columns, self.rows, self.variables)
-
-    def standard_weights_init(self):
-        """
-        Randomly initialize the weights with a random distribution with mean of 0 and std of 1.
-
-        """
-        self.weights = random.normal(0., 1., (self.columns, self.rows, self.variables))
-
-    def pick_from_data_weights_init(self, data):
-        """
-        Initialize the weights picking random samples from the input data.
-
-        """
-        indices = arange(data.shape[0])
-
-        for i in range(self.columns):
-            for j in range(self.rows):
-                self.weights[i, j] = data[random.choice(indices)]
-
     def train(self,
               data,
               eval_data=None,
               n_epochs=100,
               initial_epoch=0,
-              weights_init_method='standard',
               initial_learning_rate=1.0,
               final_learning_rate=0.01,
               initial_radius=None,
@@ -227,6 +182,7 @@ class NeuralMap:
               learning_rate_decay_function='linear',
               radius_decay_function='exponential',
               neighbourhood_function='gaussian',
+              weight_init_function='standard',
               seed=1,
               verbose=True):
         """
@@ -250,12 +206,6 @@ class NeuralMap:
             Initial training epoch.
             This might be useful when multiple training sessions are applied
             over the same instance.
-        weights_init_method: string (optional, default 'standard')
-            Method to initialize weights. It should be one of the followings:
-                * pca_weights_init
-                * uniform_weights_init
-                * standard_weights_init
-                * pick_from_data_weights_init
         initial_learning_rate: float (optional, default 1.0)
             Initial learning rate value. This value is used in the first epoch,
             and then is decremented for the following ones according to the decay function.
@@ -312,6 +262,14 @@ class NeuralMap:
                 * Neighbourhood radius
                 * Learning rate
             And should return the update value of each node as a matrix (columns, rows).
+        weight_init_function: string or function (optional, default 'standard')
+            Function to initialize weights at the beginning of training.
+            If a string is passed, it must match one of the followings:
+                * standard
+                * uniform
+                * pca
+                * pick_from_data
+                * no_init (when it's needed to keep previous values)
         seed: int or None (optional, default 1)
             Random seed.
         verbose: bool (optional, default True)
@@ -331,6 +289,11 @@ class NeuralMap:
         # restart u-matrix and hdbscan cahces
         self._unified_distance_matrix_cache = None
         self._hdbscan_cache = [(None, None, None)] * self.columns * self.rows
+
+        if seed is None:
+            random.seed(None)
+            seed = random.randint(low=0, high=1000000)
+            print('generated seed: ', seed)
 
         # get the learning rate decay function
         if learning_rate_decay_function == 'linear':
@@ -377,10 +340,25 @@ class NeuralMap:
         elif neighbourhood_function == 'no_neighbourhood':
             neighbourhood_function = _neighbourhood_functions.no_neighbourhood
 
-        if seed is None:
-            random.seed(None)
-            seed = random.randint(low=0, high=1000000)
-            print('generated seed: ', seed)
+        # get the weight initialization function
+        if weight_init_function == 'standard':
+            random.seed(seed)
+            weight_init_function = _weight_init_functions.standard
+
+        elif weight_init_function == 'uniform':
+            random.seed(seed)
+            weight_init_function = _weight_init_functions.uniform
+
+        elif weight_init_function == 'pca':
+            random.seed(seed)
+            weight_init_function = _weight_init_functions.pca
+
+        elif weight_init_function == 'pick_from_data':
+            random.seed(seed)
+            weight_init_function = _weight_init_functions.pick_from_data
+
+        elif weight_init_function == 'no_init':
+            weight_init_function = _weight_init_functions.no_init
 
         # check inputs
         _check_inputs.numpy_matrix(data, self.variables)
@@ -392,35 +370,18 @@ class NeuralMap:
         _check_inputs.positive(n_epochs)
         _check_inputs.value_type(initial_epoch, int)
         _check_inputs.value_type(initial_learning_rate, float)
-        _check_inputs.positive(initial_learning_rate)
         _check_inputs.value_type(final_learning_rate, float)
-        _check_inputs.positive(final_learning_rate)
         _check_inputs.value_type(initial_radius, float)
-        _check_inputs.positive(initial_radius)
         _check_inputs.value_type(final_radius, float)
-        _check_inputs.positive(final_radius)
         _check_inputs.function(learning_rate_decay_function)
         _check_inputs.function(radius_decay_function)
         _check_inputs.function(neighbourhood_function)
+        _check_inputs.function(weight_init_function)
         _check_inputs.value_type(seed, int)
         _check_inputs.value_type(verbose, bool)
 
-        # get the weights initialization method
-        if weights_init_method == 'standard':
-            random.seed(seed)
-            self.standard_weights_init()
-
-        elif weights_init_method == 'uniform':
-            random.seed(seed)
-            self.uniform_weights_init()
-
-        elif weights_init_method == 'pca':
-            random.seed(seed)
-            self.pca_weights_init(data)
-
-        elif weights_init_method == 'pick_from_data':
-            random.seed(seed)
-            self.pick_from_data_weights_init(data)
+        # initialize weight values
+        self.weights = weight_init_function(data, self.weights)
 
         # declare an array for quantization and topographic error of each epoch
         epochs_quantization_error = zeros(n_epochs)
@@ -502,11 +463,15 @@ class NeuralMap:
 
                     # The update matrix computed over the map center must be rotated to match the
                     # bmu, and so emulate a toroidal space. For this, the matrix is reindexed,
-                    # subtracting to the original indices the corresponding horizontal and vertival
+                    # subtracting to the original indices the corresponding horizontal and vertical
                     # displacement. Also, if the topology is hexagonal and the row of the bmu is
                     # offset from the row of the map center, it must be applied an extra correction
                     # that is computed at the beginning of the training. Finally, the new positions
                     # are rotated to fit the map dimensions.
+
+                    if plot_update and verbose:
+                        _plot.update(self.positions, self.hexagonal, update_matrix_over_center,
+                                     dimensions, None, None, None)
 
                     # computes the amount of columns and rows between the map center and the bmu
                     offset = [bmu[0] - center[0], bmu[1] - center[1]]
@@ -517,8 +482,51 @@ class NeuralMap:
                     # rotate update matrix to match its center with the bmu position
                     update_matrix = update_matrix_over_center[tuple([
                         (update_matrix_indices[0] - (offset[0] + offset_correction)) % self.columns,
-                        (update_matrix_indices[1] - offset[1]) % self.rows  # hola
+                        (update_matrix_indices[1] - offset[1]) % self.rows
                     ])]
+
+                    if plot_update and verbose:
+                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                                     None, None, None)
+                        temp_relative_positions = self.relative_positions.copy()
+                        previous_relative_positions = self.relative_positions.copy()
+                        bmu_displacement = (self.positions[bmu] - temp_relative_positions[bmu]) * \
+                            update_matrix[bmu]
+                        temp_relative_positions[bmu] += bmu_displacement
+                        displacement = (temp_relative_positions[bmu] - temp_relative_positions) * \
+                            update_matrix[..., None]
+                        displacement[bmu] = 0.
+                        temp_relative_positions += displacement
+                        displacement[bmu] = bmu_displacement
+                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                                     previous_relative_positions[bmu], previous_relative_positions,
+                                     displacement)
+
+                    # compute displacement for bmu relative position
+
+                    # get opposite point of the bmu absolute position
+                    position = self.positions[bmu]
+                    anti_bmu = (position + dimensions / 2) % dimensions
+
+                    # get the 'quadrant' the bmu is in, with respect to its opposite position
+                    quadrant = array([
+                        offset[0] > 0 or anti_bmu[0] < 1,
+                        offset[1] > 0 or anti_bmu[1] < 1
+                    ]) * 2 - 1
+
+                    # compute the matrix with the positions to which the bmu must tend
+                    mod = (self.relative_positions[bmu] * quadrant < anti_bmu * quadrant) \
+                        * dimensions * quadrant
+
+                    # compute displacement for bmu relative position
+                    bmu_displacement = (self.positions[bmu] - mod - self.relative_positions[bmu]) \
+                        * update_matrix[bmu]
+
+                    # update relative positions
+                    self.relative_positions[bmu] += bmu_displacement
+
+                    # fits new relative positions into the map
+                    self.relative_positions[bmu] %= dimensions
 
                     # computes displacement for all the relative positions of neighbourhood nodes
 
@@ -539,40 +547,22 @@ class NeuralMap:
                     displacement = (self.relative_positions[bmu] - mod - self.relative_positions) \
                         * update_matrix[..., None]
 
-                    # compute displacement for bmu relative position
-
-                    # get opposite point of the bmu relative position
-                    anti_bmu = (self.positions[bmu] + dimensions / 2) % dimensions
-
-                    # get the 'quadrant' the bmu is in, with respect to its opposite position
-                    quadrant = array([
-                        offset[0] > 0 or anti_bmu[0] < 1,
-                        offset[1] > 0 or anti_bmu[1] < 1
-                    ]) * 2 - 1
-
-                    # compute the matrix with the positions to which the bmu must tend
-                    mod = (self.relative_positions[bmu] * quadrant < anti_bmu * quadrant) \
-                        * dimensions * quadrant
-
-                    # compute displacement for bmu relative position
-                    displacement[bmu] = (self.positions[bmu] - mod - self.relative_positions[bmu]) \
-                        * update_matrix[bmu]
-
-                    # plot for easier debugging
-                    if plot_update and verbose:
-                        plot_update = False
-                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     self.relative_positions[bmu], self.relative_positions,
-                                     displacement)
-                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     None, None, None)
-                        plt.show()
+                    displacement[bmu] = 0.
 
                     # update relative positions
                     self.relative_positions += displacement
 
                     # fits new relative positions into the map
                     self.relative_positions %= dimensions
+
+                    # plot for easier debugging
+                    if plot_update and verbose:
+                        plot_update = False
+                        displacement[bmu] = bmu_displacement
+                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                                     previous_relative_positions[bmu],
+                                     previous_relative_positions, displacement)
+                        plt.show()
 
                 else:
 
@@ -582,12 +572,21 @@ class NeuralMap:
 
                     # the relative positions of neighbourhood nodes tends towards
                     # the bmu relative position
+                    bmu_displacement = (self.positions[bmu] - self.relative_positions[bmu]) \
+                        * update_matrix[bmu]
+
+                    # update relative positions
+                    self.relative_positions[bmu] += bmu_displacement
+
+                    # nodes in the bmu neighbourhood tends towards the new bmu relative position
                     displacement = (self.relative_positions[bmu] - self.relative_positions) \
                         * update_matrix[..., None]
 
-                    # the bmu relative positions tends towards its absolute position
-                    displacement[bmu] = (self.positions[bmu] - self.relative_positions[bmu]) \
-                        * update_matrix[bmu]
+                    # the bmu relative position is overridden over the displacement matrix
+                    displacement[bmu] = 0.
+
+                    # update relative positions
+                    self.relative_positions += displacement
 
                     # plot for easier debugging
                     if plot_update and verbose:
@@ -604,14 +603,10 @@ class NeuralMap:
                         print(str(bmu) + ": " + str(self.weights[bmu]))
                         print("\nUpdate of BMU and its neighbourhood: ")
                         _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     None, None,
+                                     self.relative_positions[bmu], self.relative_positions,
                                      displacement)
-                        # self.relative_positions[bmu], self.relative_positions,
                         plt.show()
                         print("----------------------------------------------------------------\n")
-
-                    # update relative positions
-                    self.relative_positions += displacement
 
                 # update weights
                 self.weights += (ind - self.weights) * update_matrix[..., None]
@@ -642,9 +637,7 @@ class NeuralMap:
 
         """
         self.activation_map = self.distance(ind.reshape([1, -1]), self.weights.reshape([
-            self.weights.shape[0] * self.weights.shape[1],
-            self.weights.shape[2]
-        ])).reshape([self.weights.shape[0], self.weights.shape[1]])
+            self.columns * self.rows, self.variables])).reshape([self.columns, self.rows])
 
         return self.activation_map
 
@@ -803,7 +796,7 @@ class NeuralMap:
         _check_inputs.numpy_matrix(data, self.variables)
         _check_inputs.length(data, attachments)
         _check_inputs.function(aggregation_function)
-        dict_map = {(i, j): [] for i in range(self.rows) for j in range(self.columns)}
+        dict_map = {(i, j): [] for i in range(self.columns) for j in range(self.rows)}
 
         for ind, attachment in zip(data, attachments):
             dict_map[tuple(self.get_best_matching_unit(ind))].append(attachment)
@@ -864,7 +857,7 @@ class NeuralMap:
 
         return clusters.labels_.reshape(self.columns, self.rows), clusters.cluster_centers_
 
-    def hdbscan(self, min_cluster_size=3, plot_condensed_tree=True):
+    def hdbscan(self, min_cluster_size=3, plot_condensed_tree=False):
         """
         Perform a clustering operation over the nodes using the HDBSCAN technique.
 
@@ -879,7 +872,7 @@ class NeuralMap:
             min_cluster_size: int (optional, default 3)
                 Minimum valid amount of nodes in each cluster.
                 Should be greater than 0.
-            plot_condensed_tree: bool (optional, default True)
+            plot_condensed_tree: bool (optional, default False)
                 Plot the clusters hierarchy.
 
         Returns
@@ -1017,8 +1010,7 @@ class NeuralMap:
 
         """
         clusters_labels = array(self.hdbscan(
-            min_cluster_size=min_cluster_size,
-            plot_condensed_tree=False)
+            min_cluster_size=min_cluster_size)
         )[0].reshape(self.columns * self.rows)
         adjacency_matrix = self.get_unified_distance_matrix()[1]
         connections = zeros(adjacency_matrix.shape) * nan
@@ -1031,185 +1023,137 @@ class NeuralMap:
                         and clusters_labels[i] >= 0 and i != j:
                     connections[i, j] = adjacency_matrix[i, j]
 
-                    if self.toroidal and norm(reshaped_rp[i] - reshaped_rp[j]) >= \
-                            min(self.columns, self.rows) / 2:
+                    distance = ((reshaped_rp[i, 0] - reshaped_rp[j, 0]) ** 2 +
+                                (reshaped_rp[i, 1] - reshaped_rp[j, 1]) ** 2) ** 0.5
+                    if self.toroidal and distance >= min(self.columns, self.rows) / 2:
                         reverse[i, j] = 1
                         reverse[j, i] = 1
 
         return connections, reverse
 
-    def plot_analysis(self, data, cluster=True, min_cluster_size=3,
-                      borders=True, display_empty_nodes=True, size=10):
+    def plot_analysis(self, data, attached_values=None, labels_to_display=None,
+                      aggregation_function=None, use_relative_positions=True, cluster=True,
+                      min_cluster_size=3, borders=True, title='Activation Frequency',
+                      display_value=None, display_empty_nodes=True, size=10):
         """
-        Plot the quantization error and activation frequency of each node placed according to their
-        relative positions and draw their connections if they are in the same HDBSCAN cluster.
+        Plot the mapped data in each node with diameters according to their activation frequency.
 
         Parameters
         ----------
         data: ndarray
             Observations to map in the SOM.
             Dimensions should be (n_obs, variables).
+        attached_values: array_like (optional, default None)
+            Array containing the data to map in the nodes.
+            Length should be n_obs.
+        labels_to_display: array_like (optional, default None)
+            Array with labels to display.
+            Useful when attached_values are data labels and it's not necessary to plot all labels
+            but it's necessary to maintain the activation frequency with respect to all data.
+            Each label to show should be passed only once.
+            Ignored if aggregation_function is not None.
+        aggregation_function: function (optional, default None)
+            Aggregation function to apply after map the attached values in the nodes.
+        use_relative_positions: bool (optional, default True)
+            Place nodes according to their relative positions.
         cluster: bool (optional, default True)
             Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
-        min_cluster_size: int (optional, default True) (optional, default 3)
+        min_cluster_size: int (optional, default 3)
             Minimum valid amount of nodes in each HDBSCAN cluster.
             Should be greater than 0.
-            Ignored if ``cluster`` is False.
+            Ignored if cluster is 0.
         borders: bool (optional, default True)
             Draw nodes borders.
+        title: string (optional, default 'Activation Frequency')
+            Plot title
+        display_value: string (optional, default None)
+            Value to display for each node.
+            Should be one of the followings:
+                * index
+                * cluster
+                * act_freq
         display_empty_nodes: bool (optional, default True)
             Display nodes that have 0 activation frequency.
         size: int (optional, default 10)
             Horizontal and vertical size of the plot.
 
         """
-        connections, reverse = None, None
-
-        if cluster:
-            connections, reverse = self.get_connections_and_reverse(min_cluster_size)
+        _check_inputs.value_type(use_relative_positions, bool)
+        _check_inputs.value_type(borders, bool)
+        _check_inputs.value_type(title, str)
+        _check_inputs.value_type(display_value, (str, type(None)))
+        _check_inputs.value_type(display_empty_nodes, bool)
+        _check_inputs.value_type(size, int)
+        _check_inputs.positive(size)
 
         analysis = self.analyse(data)
         activation_frequency = analysis[0]
         quantization_error = analysis[1]
-        _check_inputs.value_type(borders, bool)
-        _check_inputs.value_type(display_empty_nodes, bool)
-        _check_inputs.value_type(size, int)
-        _check_inputs.positive(size)
-        _plot.bubbles(activation_frequency, self.relative_positions, quantization_error, size=size,
-                      borders=borders, title='RP-HDBSCAN quantization error',
-                      connections=connections, reverse=reverse,
-                      display_empty_nodes=display_empty_nodes)
-
-    def plot_labels(self, data, labels, labels_to_display=None, cluster=True,
-                    min_cluster_size=3, borders=True, display_empty_nodes=True, size=10):
-        """
-        Plot the labels of the mapped data in each node as pie charts,
-        with diameters according to their activation frequency,
-        placed according to their relative positions
-        and draw their connections if they are in the same HDBSCAN cluster.
-
-        Parameters
-        ----------
-        data: ndarray
-            Observations to map in the SOM.
-            Dimensions should be (n_obs, variables).
-        labels: array_like
-            Array containing the data labels to map in the nodes.
-            Length should be n_obs.
-        labels_to_display: array_like (optional, default None)
-            Array with labels to display.
-            Useful when it's not necessary to plot all labels but
-            it's necessary to maintain the activation frequency with respect to all observations.
-            Each label to show should be passed only once.
-        cluster: bool (optional, default True)
-            Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
-        min_cluster_size: int (optional, default True) (optional, default 3)
-            Minimum valid amount of nodes in each HDBSCAN cluster.
-            Should be greater than 0.
-            Ignored if cluster is 0.
-        borders: bool (optional, default True)
-            Draw nodes borders.
-        display_empty_nodes: bool (optional, default True)
-            Display nodes that have 0 activation frequency.
-        size: int (optional, default 10)
-            Horizontal and vertical size of the plot.
-
-        """
-        activation_frequency = self.analyse(data)[0]
-        connections, reverse = None, None
 
         if cluster:
             connections, reverse = self.get_connections_and_reverse(min_cluster_size)
-
-        unique_labels = unique(labels)
-        _check_inputs.value_type(borders, bool)
-        _check_inputs.value_type(display_empty_nodes, bool)
-        _check_inputs.value_type(size, int)
-        _check_inputs.positive(size)
-
-        def aggregation_function(item):
-            res = zeros(unique_labels.shape[0])
-            counted = Counter(item)
-
-            for k, unique_label in enumerate(unique_labels):
-                res[k] = counted[unique_label]
-
-            return res
-
-        map_labels = self.map_attachments(data, labels, aggregation_function)
-
-        if labels_to_display is None:
-            _plot.bubbles(activation_frequency, self.relative_positions, map_labels,
-                          color_map=plt.cm.get_cmap('hsv', len(unique_labels) + 1), size=size,
-                          borders=borders, norm=False, labels=unique_labels,
-                          title='RP-HDBSCAN labels', connections=connections, reverse=reverse,
-                          display_empty_nodes=display_empty_nodes)
 
         else:
-            labels_to_display_indices = where(isin(unique_labels, labels_to_display))[0]
-            _check_inputs.positive(len(labels_to_display_indices))
-            map_labels = map_labels[..., labels_to_display_indices].reshape([
-                activation_frequency.shape[0],
-                activation_frequency.shape[1],
-                len(labels_to_display_indices)
-            ])
-            _plot.bubbles(activation_frequency, self.relative_positions, map_labels,
-                          color_map=plt.cm
-                          .get_cmap('hsv', len(unique_labels[labels_to_display_indices]) + 1),
-                          size=size, borders=borders, norm=False,
-                          labels=unique_labels[labels_to_display_indices],
-                          title='RP-HDBSCAN labels', connections=connections, reverse=reverse,
-                          display_empty_nodes=display_empty_nodes)
+            connections, reverse = None, None
 
-    def plot_map_value(self, data, attached_values, func=mean, cluster=True, min_cluster_size=3,
-                       borders=True, display_empty_nodes=True, size=10):
-        """
-        Plot data related values mapped in each node,
-        with diameters according to their activation frequency,
-        placed according to their relative positions
-        and draw their connections if they are in the same HDBSCAN cluster.
+        if use_relative_positions:
+            positions = self.relative_positions
 
-        Parameters
-        ----------
-        data: ndarray
-            Observations to map in the SOM.
-            Dimensions should be (n_obs, variables).
-        attached_values: array_like
-            Array containing the values associated to each observation.
-            Length should be n_obs.
-        func: function (optional, default mean)
-            Aggregation function to apply after map the attached values in the nodes.
-        cluster: bool (optional, default True)
-            Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
-        min_cluster_size: int (optional, default True) (optional, default 3)
-            Minimum valid amount of nodes in each HDBSCAN cluster.
-            Should be greater than 0.
-            Ignored if cluster is 0.
-        borders: bool (optional, default True)
-            Draw nodes borders.
-        display_empty_nodes: bool (optional, default True)
-            Display nodes that have 0 activation frequency.
-        size: int (optional, default 10)
-            Horizontal and vertical size of the plot.
+        else:
+            positions = self.positions
 
-        """
-        activation_frequency = self.analyse(data)[0]
-        connections, reverse = None, None
+        if attached_values is not None:
+            if aggregation_function is not None:
+                unique_labels = None
+                map_values = self.map_attachments(data, attached_values, aggregation_function)
+                normalize = True
 
-        if cluster:
-            connections, reverse = self.get_connections_and_reverse(min_cluster_size)
+            else:
+                unique_labels = unique(attached_values)
 
-        _check_inputs.value_type(borders, bool)
-        _check_inputs.value_type(display_empty_nodes, bool)
-        _check_inputs.value_type(size, int)
-        _check_inputs.positive(size)
-        nodes_values = self.map_attachments(data, attached_values, func)
-        _plot.bubbles(activation_frequency, self.relative_positions, nodes_values, size=size,
-                      borders=borders, norm=True, title='RP-HDBSCAN attached values',
+                def aggregation_function(item):
+                    res = zeros(unique_labels.shape[0])
+                    counted = Counter(item)
+
+                    for k, unique_label in enumerate(unique_labels):
+                        res[k] = counted[unique_label]
+
+                    return res
+
+                map_values = self.map_attachments(data, attached_values, aggregation_function)
+                normalize = False
+                if labels_to_display is not None:
+                    labels_to_display_indices = where(isin(unique_labels, labels_to_display))[0]
+                    unique_labels = unique_labels[labels_to_display_indices]
+                    _check_inputs.positive(len(labels_to_display_indices))
+                    map_values = map_values[..., labels_to_display_indices].reshape([
+                        self.columns,
+                        self.rows,
+                        len(labels_to_display_indices)
+                    ])
+
+        else:
+            unique_labels = None
+            map_values = quantization_error
+            normalize = True
+
+        text = None
+        if display_value == 'index':
+            text = [[(i, j) for j in range(self.rows)] for i in range(self.columns)]
+
+        if display_value == 'cluster':
+            text = self.hdbscan(min_cluster_size=min_cluster_size)[0]
+
+        if display_value == 'act_freq':
+            text = activation_frequency.astype(int)
+
+        _plot.bubbles(activation_frequency, positions, map_values, size=size, text=text,
+                      borders=borders, norm=normalize, labels=unique_labels, title=title,
                       connections=connections, reverse=reverse,
                       display_empty_nodes=display_empty_nodes)
 
-    def plot_unified_distance_matrix(self, detailed=True, borders=True, size=10, grid=False):
+    def plot_unified_distance_matrix(self, detailed=True, borders=True, title='U-matrix',
+                                     min_cluster_size=3, display_value=None, size=10):
         """
         Plot the u-matrix.
 
@@ -1220,28 +1164,47 @@ class NeuralMap:
             or just the average.
         borders: bool (optional, default True)
             Draw nodes borders.
+        title: string (optional, default 'Weight vectors')
+            Plot title
+        min_cluster_size: int (optional, default 3)
+            Minimum valid amount of nodes in each HDBSCAN cluster.
+            Should be greater than 0.
+            Ignored if cluster is 0.
+        display_value: string (optional, default None)
+            Value to display for each node.
+            Should be one of the followings:
+                * index
+                * cluster
         size: int (optional, default 10)
             Horizontal and vertical size of the plot.
-        grid: bool (optional, default False)
-            Plot a grid over the nodes.
 
         """
         _check_inputs.value_type(detailed, bool)
         _check_inputs.value_type(borders, bool)
+        _check_inputs.value_type(title, str)
+        _check_inputs.value_type(display_value, (str, type(None)))
         _check_inputs.value_type(size, int)
         _check_inputs.positive(size)
         unified_distance_matrix = self.get_unified_distance_matrix()[0]
 
+        text = None
+        if display_value == 'index':
+            text = [[(i, j) for j in range(self.rows)] for i in range(self.columns)]
+
+        if display_value == 'cluster':
+            text = self.hdbscan(min_cluster_size=min_cluster_size)[0]
+
         if detailed:
             _plot.tiles(self.positions, self.hexagonal, unified_distance_matrix,
-                        title='Distance between nodes', borders=borders, size=size, grid=grid)
+                        title=title, borders=borders, size=size, text=text)
 
         else:
             _plot.tiles(self.positions, self.hexagonal, unified_distance_matrix[..., -1],
-                        title='Distance between nodes', borders=borders, size=size, grid=grid)
+                        title=title, borders=borders, size=size, text=text)
 
     def plot_weights(self, scaler=None, weights_to_display=None, headers=None, borders=True,
-                     size=10, grid=False):
+                     title='Weight vectors', use_relative_positions=True, cluster=True,
+                     min_cluster_size=3, display_value=None, size=10):
         """
         Plot the nodes weights vectors.
 
@@ -1255,13 +1218,29 @@ class NeuralMap:
             List of titles to put to each plot. They could be the original name of the weights.
         borders: bool (optional, default True)
             Draw nodes borders.
+        title: string (optional, default 'Weight vectors')
+            Plot title
+        use_relative_positions: bool (optional, default True)
+            Place nodes according to their relative positions.
+        cluster: bool (optional, default True)
+            Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
+        min_cluster_size: int (optional, default 3)
+            Minimum valid amount of nodes in each HDBSCAN cluster.
+            Should be greater than 0.
+            Ignored if cluster is 0.
+        display_value: string (optional, default None)
+            Value to display for each node.
+            Should be one of the followings:
+                * index
+                * cluster
+                * act_freq
         size: int (optional, default 10)
             Horizontal and vertical size of the plot.
-        grid: bool (optional, default False)
-            Plot a grid over the nodes.
 
         """
         _check_inputs.value_type(borders, bool)
+        _check_inputs.value_type(title, str)
+        _check_inputs.value_type(display_value, (str, type(None)))
         _check_inputs.value_type(size, int)
         _check_inputs.positive(size)
 
@@ -1269,23 +1248,46 @@ class NeuralMap:
             weights = self.weights.copy()
 
         else:
-            weights = scaler.inverse_transform(self.weights.reshape(-1, self.weights.shape[2])) \
+            weights = scaler.inverse_transform(self.weights.reshape(-1, self.variables)) \
                 .reshape(self.weights.shape)
 
+        if cluster:
+            connections, reverse = self.get_connections_and_reverse(min_cluster_size)
+
+        else:
+            connections, reverse = None, None
+
+        if use_relative_positions:
+            positions = self.relative_positions
+
+        else:
+            positions = self.positions
+
         if weights_to_display is None:
-            weights_to_display = list(range(weights.shape[2]))
+            weights_to_display = list(range(self.variables))
 
         if headers is None:
-            headers = weights_to_display
+            headers = list(range(self.variables))
 
-        _check_inputs.length(weights_to_display, headers)
+        text = None
+        if display_value == 'index':
+            text = [[(i, j) for j in range(self.rows)] for i in range(self.columns)]
+
+        if display_value == 'cluster':
+            text = self.hdbscan(min_cluster_size=min_cluster_size)[0]
+
+        _plot.bubbles(zeros((self.columns, self.rows)) + 1., positions,
+                      self.weights[..., weights_to_display] / self.weights.sum(axis=-1)[..., None],
+                      title=title, labels=list(headers[i] for i in weights_to_display), norm=False,
+                      borders=borders, size=size, text=text, connections=connections,
+                      reverse=reverse)
 
         for weight in weights_to_display:
             _plot.tiles(self.positions, self.hexagonal, weights[..., weight],
-                        title=headers[weight], borders=borders, size=size, grid=grid)
+                        title=headers[weight], borders=borders, size=size, text=text)
 
-    def plot_weights_vector(self, node_index=(0, 0), xticks_labels=None, bars=True,
-                            scatter=False, line=False):
+    def plot_weights_vector(self, node_index=(0, 0), scaler=None, xticks_labels=None, bars=True,
+                            line=False, scatter=False, size=10):
         """
         Plot the weights vector of a node.
 
@@ -1293,41 +1295,52 @@ class NeuralMap:
         ---------
         node_index: tuple (optional, default (0, 0))
             Index of the node (column, row).
+        scaler: scaler (optional, default None)
+            sklearn scaler to apply inverse transform to weights.
         xticks_labels: list (optional, default None)
             List of weights labels.
         bars: bool (optional, default True)
             Plot the weights vector using bars.
-        scatter: bool (optional, default False)
-            Plot the weights vector using points.
         line: bool (optional, default False)
             Plot the weights vector using a line.
+        scatter: bool (optional, default False)
+            Plot the weights vector using points.
+        size: int (optional, default 10)
+            Horizontal and vertical size of the plot.
 
         """
         _check_inputs.value_type(node_index, tuple)
         _check_inputs.value_type(bars, bool)
-        _check_inputs.value_type(scatter, bool)
         _check_inputs.value_type(line, bool)
+        _check_inputs.value_type(scatter, bool)
+        _check_inputs.value_type(size, int)
+        _check_inputs.positive(size)
         node = self.weights[node_index]
-        plt.figure(figsize=(20, 5))
+
+        if scaler is not None:
+            node = scaler.inverse_transform([node])[0]
+
+        plt.figure(figsize=(size, size))
 
         if bars:
-            plt.bar(list(range(node.shape[0])), node)
-
-        if scatter:
-            plt.scatter(list(range(node.shape[0])), node)
+            plt.bar(list(range(self.variables)), node, color='blue', zorder=1)
 
         if line:
-            plt.plot(list(range(node.shape[0])), node)
+            plt.plot(list(range(self.variables)), node, color='green', zorder=2)
+
+        if scatter:
+            plt.scatter(list(range(self.variables)), node, color='red', zorder=3)
 
         plt.title("Node " + str(node_index) + " weights vector")
 
         if xticks_labels is None:
-            xticks_labels = list(range(node.shape[0]))
+            xticks_labels = list(range(self.variables))
 
-        plt.xticks(ticks=list(range(node.shape[0])), labels=xticks_labels, rotation='vertical')
+        plt.xticks(ticks=list(range(self.variables)), labels=xticks_labels, rotation='vertical')
 
-    def plot_cluster_weights_vectors(self, cluster=None, xticks_labels=None, min_cluster_size=3,
-                                     display_median=False, display_mean=True, display_lines=True):
+    def plot_cluster_weights_vectors(self, cluster=None, scaler=None, xticks_labels=None,
+                                     min_cluster_size=3, display_median=False, display_mean=True,
+                                     display_lines=True, size=10):
         """
         Plot the weights vector of a HDBSCAN cluster of nodes, or for all nodes.
         Also plot the nodes weights vectors median or mean.
@@ -1337,6 +1350,8 @@ class NeuralMap:
         cluster: int (optional, default None)
             HDBSCAN cluster number to display.
             If nothing is provided, plot all nodes.
+        scaler: scaler (optional, default None)
+            sklearn scaler to apply inverse transform to weights.
         xticks_labels: list (optional, default None)
             List of weights labels.
         min_cluster_size: int (optional, default 3)
@@ -1348,13 +1363,21 @@ class NeuralMap:
             Plot the mean of the weights vectors.
         display_lines: bool (optional, default True)
             Plot the weights vector using a line.
+        size: int (optional, default 10)
+            Horizontal and vertical size of the plot.
 
         """
         _check_inputs.value_type(display_median, bool)
         _check_inputs.value_type(display_mean, bool)
         _check_inputs.value_type(display_lines, bool)
         labels = self.hdbscan(plot_condensed_tree=False, min_cluster_size=min_cluster_size)[0]
-        values = self.weights.reshape((-1, self.variables))
+
+        if scaler is None:
+            values = self.weights.reshape((-1, self.variables))
+
+        else:
+            values = scaler.inverse_transform(self.weights.reshape(-1, self.variables))
+
         cluster_title = "Weights vectors"
         alpha = 1.
 
@@ -1371,7 +1394,7 @@ class NeuralMap:
             alpha = 0.5
             cluster_title += '. Median, Q1 y Q3'
 
-        plt.figure(figsize=(20, 5))
+        plt.figure(figsize=(size, size))
 
         for value in values:
             plt.scatter(list(range(self.variables)), value, alpha=alpha)

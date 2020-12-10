@@ -14,9 +14,11 @@ This package includes:
  - Customizable SOM-specific plots
  - Decay functions for configuring SOM training
  - Neighbourhood functions for configuring SOM training
+ - Functions to initialize the weights vectors of the nodes
 
 """
 from ._neural_map import *
 from ._plot import *
 from ._decay_functions import *
 from ._neighbourhood_functions import *
+from ._weight_init_functions import *

@@ -18,7 +18,7 @@ from matplotlib.patches import Polygon, RegularPolygon, Circle, Wedge, Patch
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-def update(positions, hexagonal, data, dimensions, bmu=None, relative_positions=None,
+def update(positions, hexagonal, data, dimensions=10, bmu=None, relative_positions=None,
            displacement=None, color_map=plt.cm.get_cmap('RdYlGn_r')):
     """
     Plot the update value of each node and their relative position displacement.
@@ -61,7 +61,7 @@ def update(positions, hexagonal, data, dimensions, bmu=None, relative_positions=
     data_c /= data_max - data_min
     x_range = arange(positions.shape[0])
     y_range = arange(positions.shape[1])
-    figure = plt.figure(figsize=(5, 5))
+    figure = plt.figure(figsize=(dimensions, dimensions))
     axes = figure.add_subplot(111)
     axes.set_aspect('equal')
 
@@ -92,8 +92,6 @@ def update(positions, hexagonal, data, dimensions, bmu=None, relative_positions=
 
     if bmu is not None:
         axes.add_patch(Circle(bmu, radius=radius / 3, facecolor='white', edgecolor='white'))
-        axes.add_patch(Circle((bmu + dimensions / 2) % dimensions, radius=radius / 3,
-                              facecolor='black', edgecolor='black'))
     if relative_positions is not None and displacement is not None:
         axes.quiver(relative_positions[..., 0], relative_positions[..., 1], displacement[..., 0],
                     displacement[..., 1], angles='xy', scale_units='xy', scale=1, zorder=10)
@@ -102,8 +100,8 @@ def update(positions, hexagonal, data, dimensions, bmu=None, relative_positions=
                   data_min, data_max, color_map, figure, axes)
 
 
-def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, borders=False,
-          norm=True, labels=None, intensity=None, title=None, grid=False):
+def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10, text=None,
+          borders=False, norm=True, labels=None, intensity=None, title=None):
     """
     Plot the map with nodes having colors according to their values (or set of values).
     Nodes have an hexagonal or squared shape that completely fill the space.
@@ -123,6 +121,9 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
         Ignored if entered a ``labels`` value.
     size: int (optional, default 10)
         Horizontal and vertical size of the final plot.
+    text: array_like (optional, default None)
+        Text to display for each node.
+        Dimensions should be (x, y).
     borders: bool (optional, default False)
         Draw nodes borders.
     norm: bool (optional, default True)
@@ -136,8 +137,6 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
         Values should be in the range [0, 1].
     title: string (optional, default None)
         Plot some title.
-    grid: bool (optional, default False)
-        Plot a grid over the nodes.
 
     """
     if intensity is None:
@@ -145,6 +144,9 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
 
     if labels is not None:
         color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
+
+    if text is None:
+        text = [[''] * positions.shape[1]] * positions.shape[0]
 
     data_c = data.copy()
     data_max = nanmax(data_c)
@@ -172,7 +174,7 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
         num_vertices = 6
         radius = (3 ** 0.5) / 3
         orientation = 0
-        axes.set_xticks(x_range + 0.25)
+        axes.set_xticks(x_range)
         axes.set_yticks(y_range * (3 ** 0.5) / 2)
 
     else:
@@ -309,6 +311,8 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                        radius=radius, orientation=orientation,
                                        fill=0, edgecolor='black', alpha=intensity[i, j]))
 
+                axes.text(*positions[i, j], text[i][j], ha="center", va="center")
+
             else:
                 if not isnan(data_c[i, j]):
                     if borders:
@@ -322,14 +326,14 @@ def tiles(positions, hexagonal, data, color_map=plt.cm.get_cmap('RdYlGn_r'), siz
                                        orientation=orientation, facecolor=color_map(data_c[i, j]),
                                        edgecolor=edge_color, alpha=intensity[i, j]))
 
-    if grid:
-        plt.grid()
+                    axes.text(*positions[i, j], text[i][j], ha="center", va="center")
+
     legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
                   [positions[..., 0].min(), positions[..., 1].min()],
                   data_min, data_max, color_map, figure, axes, labels=labels)
 
 
-def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), size=10,
+def bubbles(diameters, positions, data, color_map=None, size=10, text=None,
             borders=False, norm=True, labels=None, intensity=None, title=None, connections=None,
             reverse=None, display_empty_nodes=True):
     """
@@ -348,11 +352,13 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
     data: array_like
         Value of each node.
         Dimensions should be (x, y).
-    color_map: colormap (optional, default plt.cm.get_cmap('RdYlGn_r'))
+    color_map: colormap (optional, default None)
         Color map to paint the nodes.
-        Ignored if entered a ``labels`` value.
     size: int (optional, default 10)
         Horizontal and vertical size of the final plot.
+    text: array_like (optional, default None)
+        Text to display for each node.
+        Dimensions should be (x, y).
     borders: bool (optional, default False)
         Draw nodes borders.
     norm: bool (optional, default True)
@@ -381,8 +387,15 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
     if intensity is None:
         intensity = ones((positions.shape[0], positions.shape[1]))
 
-    if labels is not None:
-        color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
+    if color_map is None:
+        if labels is not None:
+            color_map = plt.cm.get_cmap('hsv', len(labels) + 1)
+
+        else:
+            color_map = plt.cm.get_cmap('RdYlGn_r')
+
+    if text is None:
+        text = [[''] * positions.shape[1]] * positions.shape[0]
 
     d_max = diameters.max()
     data_c = data.copy()
@@ -474,6 +487,8 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
                                    facecolor='None', edgecolor='black', zorder=-diameters[i, j],
                                    alpha=intensity[i, j]))
 
+                    axes.text(*positions[i, j], text[i][j], ha="center", va="center")
+
                 else:
                     if borders:
                         edge_color = 'black'
@@ -485,6 +500,7 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
                                           facecolor=color_map(data_c[i, j]), edgecolor=edge_color,
                                           zorder=-diameters[i, j],
                                           alpha=intensity[i, j]))
+                    axes.text(*positions[i, j], text[i][j], ha="center", va="center")
 
             else:
                 if display_empty_nodes:
@@ -492,6 +508,7 @@ def bubbles(diameters, positions, data, color_map=plt.cm.get_cmap('RdYlGn_r'), s
                         RegularPolygon(positions[i, j], numVertices=4, radius=sqrt(1 / d_max) / 3,
                                        facecolor='lightgrey', edgecolor='lightgrey', zorder=-d_max,
                                        alpha=intensity[i, j]))
+                    axes.text(*positions[i, j], text[i][j], ha="center", va="center")
 
     legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],
                   [positions[..., 0].min(), positions[..., 1].min()],

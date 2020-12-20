@@ -439,13 +439,7 @@ class NeuralMap:
 
             # plot update matrix and relative positions displacement
             # for the first iteration in each epoch
-            plot_update = False
-
-            # plt.scatter(self._rp[..., 0], self._rp[..., 1])
-            # plt.show()
-            # plt.scatter((self._rp[..., 0] + self._width / 3) % self._width,
-            #             (self._rp[..., 1] + self._height / 3) % self._height)
-            # plt.show()
+            # plot_update = False
 
             # in case of having a toroidal topology the update matrix is the same for each iteration
             # in every iteration, this matrix is rotated to match the bmu position
@@ -469,9 +463,10 @@ class NeuralMap:
                     # that is computed at the beginning of the training. Finally, the new positions
                     # are rotated to fit the map dimensions.
 
-                    if plot_update and verbose:
-                        _plot.update(self.positions, self.hexagonal, update_matrix_over_center,
-                                     dimensions, None, None, None)
+                    # plot for easier debugging
+                    # if plot_update and verbose:
+                    #     _plot.update(self.positions, self.hexagonal, update_matrix_over_center,
+                    #                  dimensions, None, None, None)
 
                     # computes the amount of columns and rows between the map center and the bmu
                     offset = [bmu[0] - center[0], bmu[1] - center[1]]
@@ -485,22 +480,23 @@ class NeuralMap:
                         (update_matrix_indices[1] - offset[1]) % self.rows
                     ])]
 
-                    if plot_update and verbose:
-                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     None, None, None)
-                        temp_relative_positions = self.relative_positions.copy()
-                        previous_relative_positions = self.relative_positions.copy()
-                        bmu_displacement = (self.positions[bmu] - temp_relative_positions[bmu]) * \
-                            update_matrix[bmu]
-                        temp_relative_positions[bmu] += bmu_displacement
-                        displacement = (temp_relative_positions[bmu] - temp_relative_positions) * \
-                            update_matrix[..., None]
-                        displacement[bmu] = 0.
-                        temp_relative_positions += displacement
-                        displacement[bmu] = bmu_displacement
-                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     previous_relative_positions[bmu], previous_relative_positions,
-                                     displacement)
+                    # plot for easier debugging
+                    # if plot_update and verbose:
+                    #     _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                    #                  None, None, None)
+                    #     temp_relative_positions = self.relative_positions.copy()
+                    #     previous_relative_positions = self.relative_positions.copy()
+                    #     bmu_displacement = (self.positions[bmu] - temp_relative_positions[bmu]) *
+                    #         update_matrix[bmu]
+                    #     temp_relative_positions[bmu] += bmu_displacement
+                    #     displacement = (temp_relative_positions[bmu] - temp_relative_positions) *
+                    #         update_matrix[..., None]
+                    #     displacement[bmu] = 0.
+                    #     temp_relative_positions += displacement
+                    #     displacement[bmu] = bmu_displacement
+                    #     _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                    #              previous_relative_positions[bmu], previous_relative_positions,
+                    #              displacement)
 
                     # compute displacement for bmu relative position
 
@@ -556,13 +552,13 @@ class NeuralMap:
                     self.relative_positions %= dimensions
 
                     # plot for easier debugging
-                    if plot_update and verbose:
-                        plot_update = False
-                        displacement[bmu] = bmu_displacement
-                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     previous_relative_positions[bmu],
-                                     previous_relative_positions, displacement)
-                        plt.show()
+                    # if plot_update and verbose:
+                    #     plot_update = False
+                    #     displacement[bmu] = bmu_displacement
+                    #     _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                    #                  previous_relative_positions[bmu],
+                    #                  previous_relative_positions, displacement)
+                    #     plt.show()
 
                 else:
 
@@ -589,24 +585,24 @@ class NeuralMap:
                     self.relative_positions += displacement
 
                     # plot for easier debugging
-                    if plot_update and verbose:
-                        plot_update = False
-                        print("\nInput vector: ")
-                        print("(" + str(i) + "): " + str(ind))
-                        print("\nActivation map: ")
-                        _plot.update(self.positions, self.hexagonal, self.activation_map,
-                                     dimensions,
-                                     None, None,
-                                     displacement)
-                        plt.show()
-                        print("\nBest Matching Unit: ")
-                        print(str(bmu) + ": " + str(self.weights[bmu]))
-                        print("\nUpdate of BMU and its neighbourhood: ")
-                        _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
-                                     self.relative_positions[bmu], self.relative_positions,
-                                     displacement)
-                        plt.show()
-                        print("----------------------------------------------------------------\n")
+                    # if plot_update and verbose:
+                    #     plot_update = False
+                    #     print("\nInput vector: ")
+                    #     print("(" + str(i) + "): " + str(ind))
+                    #     print("\nActivation map: ")
+                    #     _plot.update(self.positions, self.hexagonal, self.activation_map,
+                    #                  dimensions,
+                    #                  None, None,
+                    #                  displacement)
+                    #     plt.show()
+                    #     print("\nBest Matching Unit: ")
+                    #     print(str(bmu) + ": " + str(self.weights[bmu]))
+                    #     print("\nUpdate of BMU and its neighbourhood: ")
+                    #     _plot.update(self.positions, self.hexagonal, update_matrix, dimensions,
+                    #                  self.relative_positions[bmu], self.relative_positions,
+                    #                  displacement)
+                    #     plt.show()
+                    #     print("----------------------------------------------------------------\n")
 
                 # update weights
                 self.weights += (ind - self.weights) * update_matrix[..., None]
@@ -788,10 +784,8 @@ class NeuralMap:
 
         """
         if aggregation_function is None:
-            def identity(input_value):
+            def aggregation_function(input_value):
                 return input_value
-
-            aggregation_function = identity
 
         _check_inputs.numpy_matrix(data, self.variables)
         _check_inputs.length(data, attachments)
@@ -892,7 +886,11 @@ class NeuralMap:
         if self._hdbscan_cache[min_cluster_size][0] is not None \
                 and self._hdbscan_cache[min_cluster_size][1] is not None \
                 and self._hdbscan_cache[min_cluster_size][2] is not None:
-            return self._hdbscan_cache[min_cluster_size]
+            return (
+                self._hdbscan_cache[min_cluster_size][0].copy(),
+                self._hdbscan_cache[min_cluster_size][1].copy(),
+                self._hdbscan_cache[min_cluster_size][2].copy()
+            )
 
         adjacency_matrix = self.get_unified_distance_matrix()[1]
         clusters = HDBSCAN(metric='precomputed', min_cluster_size=min_cluster_size, min_samples=2)
@@ -903,6 +901,7 @@ class NeuralMap:
 
         if plot_condensed_tree:
             clusters.condensed_tree_.plot(select_clusters=True, label_clusters=True)
+            plt.show()
 
         self._hdbscan_cache[min_cluster_size] = (
             labels.reshape(self.columns, self.rows),
@@ -910,7 +909,11 @@ class NeuralMap:
             outlier_scores.reshape(self.columns, self.rows)
         )
 
-        return self._hdbscan_cache[min_cluster_size]
+        return (
+            self._hdbscan_cache[min_cluster_size][0].copy(),
+            self._hdbscan_cache[min_cluster_size][1].copy(),
+            self._hdbscan_cache[min_cluster_size][2].copy()
+        )
 
     def evaluate(self, data):
         """
@@ -1203,8 +1206,8 @@ class NeuralMap:
                         title=title, borders=borders, size=size, text=text)
 
     def plot_weights(self, scaler=None, weights_to_display=None, headers=None, borders=True,
-                     title='Weight vectors', use_relative_positions=True, cluster=True,
-                     min_cluster_size=3, display_value=None, size=10):
+                     show_all=True, title='Weight vectors', use_relative_positions=True,
+                     cluster=True, min_cluster_size=3, display_value=None, size=10):
         """
         Plot the nodes weights vectors.
 
@@ -1218,16 +1221,22 @@ class NeuralMap:
             List of titles to put to each plot. They could be the original name of the weights.
         borders: bool (optional, default True)
             Draw nodes borders.
+        show_all: bool (optional, default True)
+            Plot all the weights in a single visualization.
         title: string (optional, default 'Weight vectors')
-            Plot title
+            Plot title.
+            Ignored if bubble is False.
         use_relative_positions: bool (optional, default True)
             Place nodes according to their relative positions.
+            Ignored if bubble is False.
         cluster: bool (optional, default True)
             Display the connections between adjacent nodes that are in the same HDBSCAN cluster.
+            Ignored if bubble is False.
         min_cluster_size: int (optional, default 3)
             Minimum valid amount of nodes in each HDBSCAN cluster.
             Should be greater than 0.
             Ignored if cluster is 0.
+            Ignored if bubble is False.
         display_value: string (optional, default None)
             Value to display for each node.
             Should be one of the followings:
@@ -1251,18 +1260,6 @@ class NeuralMap:
             weights = scaler.inverse_transform(self.weights.reshape(-1, self.variables)) \
                 .reshape(self.weights.shape)
 
-        if cluster:
-            connections, reverse = self.get_connections_and_reverse(min_cluster_size)
-
-        else:
-            connections, reverse = None, None
-
-        if use_relative_positions:
-            positions = self.relative_positions
-
-        else:
-            positions = self.positions
-
         if weights_to_display is None:
             weights_to_display = list(range(self.variables))
 
@@ -1276,11 +1273,24 @@ class NeuralMap:
         if display_value == 'cluster':
             text = self.hdbscan(min_cluster_size=min_cluster_size)[0]
 
-        _plot.bubbles(zeros((self.columns, self.rows)) + 1., positions,
-                      self.weights[..., weights_to_display] / self.weights.sum(axis=-1)[..., None],
-                      title=title, labels=list(headers[i] for i in weights_to_display), norm=False,
-                      borders=borders, size=size, text=text, connections=connections,
-                      reverse=reverse)
+        if show_all:
+            if cluster:
+                connections, reverse = self.get_connections_and_reverse(min_cluster_size)
+
+            else:
+                connections, reverse = None, None
+
+            if use_relative_positions:
+                positions = self.relative_positions
+
+            else:
+                positions = self.positions
+
+            sizes = self.weights[..., weights_to_display] / self.weights.sum(axis=-1)[..., None]
+            _plot.bubbles(zeros((self.columns, self.rows)) + 1., positions, sizes, title=title,
+                          labels=list(headers[i] for i in weights_to_display), norm=False,
+                          borders=borders, size=size, text=text, connections=connections,
+                          reverse=reverse)
 
         for weight in weights_to_display:
             _plot.tiles(self.positions, self.hexagonal, weights[..., weight],

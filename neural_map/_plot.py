@@ -458,7 +458,7 @@ def bubbles(diameters, positions, data, color_map=None, size=10, text=None,
 
                     plt.plot([first_pos[0], second_pos[0]], [first_pos[1], second_pos[1]],
                              zorder=-d_max * 2, color='black',
-                             alpha=(0.1 + cm_min / connections[i, j]) / 1.1)
+                             alpha=(0.2 + cm_min / connections[i, j]) / 1.2)
 
     for i in range(data_c.shape[0]):
         for j in range(data_c.shape[1]):
@@ -470,22 +470,21 @@ def bubbles(diameters, positions, data, color_map=None, size=10, text=None,
                         end = start + data_c[i, j, k] * 360 / diameters[i, j]
 
                         if data_c[i, j, k]:
-                            axes.add_patch(
-                                Wedge(positions[i, j], r=sqrt(diameters[i, j] / d_max) / 3,
-                                      theta1=start,
-                                      theta2=end,
-                                      facecolor=color_map(k / data_c[i, j].shape[0]),
-                                      edgecolor=color_map(k / data_c[i, j].shape[0]),
-                                      zorder=-diameters[i, j],
-                                      alpha=intensity[i, j]))
+                            radius = 0.8 * sqrt(diameters[i, j] / d_max) / 3
+                            axes.add_patch(Wedge(positions[i, j], r=radius, theta1=start,
+                                                 theta2=end,
+                                                 facecolor=color_map(k / data_c[i, j].shape[0]),
+                                                 edgecolor=color_map(k / data_c[i, j].shape[0]),
+                                                 zorder=-diameters[i, j],
+                                                 alpha=intensity[i, j]))
 
                         start = end
 
                     if borders:
-                        axes.add_patch(
-                            Circle(positions[i, j], radius=sqrt(diameters[i, j] / d_max) / 3,
-                                   facecolor='None', edgecolor='black', zorder=-diameters[i, j],
-                                   alpha=intensity[i, j]))
+                        radius = 0.8 * sqrt(diameters[i, j] / d_max) / 3
+                        axes.add_patch(Circle(positions[i, j], radius=radius, facecolor='None',
+                                       edgecolor='black', zorder=-diameters[i, j],
+                                       alpha=intensity[i, j]))
 
                     axes.text(*positions[i, j], text[i][j], ha="center", va="center")
 
@@ -496,18 +495,18 @@ def bubbles(diameters, positions, data, color_map=None, size=10, text=None,
                     else:
                         edge_color = color_map(data_c[i, j])
 
-                    axes.add_patch(Circle(positions[i, j], radius=sqrt(diameters[i, j] / d_max) / 3,
+                    radius = 0.8 * sqrt(diameters[i, j] / d_max) / 3
+                    axes.add_patch(Circle(positions[i, j], radius=radius,
                                           facecolor=color_map(data_c[i, j]), edgecolor=edge_color,
-                                          zorder=-diameters[i, j],
-                                          alpha=intensity[i, j]))
+                                          zorder=-diameters[i, j], alpha=intensity[i, j]))
                     axes.text(*positions[i, j], text[i][j], ha="center", va="center")
 
             else:
                 if display_empty_nodes:
-                    axes.add_patch(
-                        RegularPolygon(positions[i, j], numVertices=4, radius=sqrt(1 / d_max) / 3,
-                                       facecolor='lightgrey', edgecolor='lightgrey', zorder=-d_max,
-                                       alpha=intensity[i, j]))
+                    radius = 0.8 * sqrt(1 / d_max) / 3
+                    axes.add_patch(RegularPolygon(positions[i, j], numVertices=4, radius=radius,
+                                   facecolor='lightgrey', edgecolor='lightgrey', zorder=-d_max,
+                                   alpha=intensity[i, j]))
                     axes.text(*positions[i, j], text[i][j], ha="center", va="center")
 
     legend_or_bar([positions[..., 0].max(), positions[..., 1].max()],

@@ -53,7 +53,7 @@ def uniform(_data, weights):
         New weight values
 
     """
-    return random.rand(weights.shape)
+    return random.rand(*weights.shape)
 
 
 def pca(data, weights):

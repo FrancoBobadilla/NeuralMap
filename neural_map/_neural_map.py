@@ -120,7 +120,7 @@ class NeuralMap:
         self.kwargs = kwargs
 
         if isinstance(metric, str):
-           self._distance_cdist
+           self.distance = self._distance_cdist
         else:
             self.distance = self._distance_metric
 

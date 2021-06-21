@@ -120,14 +120,10 @@ class NeuralMap:
         self.kwargs = kwargs
 
         if isinstance(metric, str):
-            def distance(first_array, second_array):
-                return cdist(first_array, second_array, self.metric, **self.kwargs)
-
+           self.distance = self._distance_cdist
         else:
-            def distance(first_array, second_array):
-                return self.metric(first_array, second_array, **self.kwargs)
+            self.distance = self._distance_metric
 
-        self.distance = distance
         self.distance(array([[0., 1.]]), array([[1., 2.], [3., 4.]]))
         self.columns = columns
         self.rows = rows
@@ -1443,3 +1439,9 @@ class NeuralMap:
             xticks_labels = list(range(self.variables))
 
         plt.xticks(ticks=list(range(self.variables)), labels=xticks_labels, rotation='vertical')
+
+    def _distance_metric(first_array, second_array):
+        return self.metric(first_array, second_array, **self.kwargs)
+
+    def _distance_cdist(self, first_array, second_array):
+        return cdist(first_array, second_array, self.metric, **self.kwargs)
